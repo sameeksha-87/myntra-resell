@@ -41,7 +41,7 @@ function ProductPage() {
         {/* Gallery */}
         <div className="grid grid-cols-[80px_1fr] gap-3">
           <div className="flex flex-col gap-2">
-            {p.gallery.map((g, i) => (
+            {p.gallery.map((g: string, i: number) => (
               <button
                 key={g + i}
                 onClick={() => setActive(i)}
