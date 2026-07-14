@@ -73,7 +73,7 @@ function ResellFlow() {
           {step === 0 && (
             <PhotoStep
               photos={photos}
-              onToggle={(k) => setPhotos((p) => ({ ...p, [k]: !p[k] }))}
+              onToggle={(k: string) => setPhotos((p) => ({ ...p, [k]: !p[k] }))}
               onContinue={() => setStep(1)}
               done={photosDone}
             />
