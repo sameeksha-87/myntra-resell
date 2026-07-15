@@ -32,16 +32,24 @@ function Index() {
               <Sparkles className="h-3 w-3" /> Premium Thrift · Recycle
             </span>
             <h1 className="mt-4 font-display text-4xl font-black leading-tight md:text-6xl">
-              Pre-loved fashion,<br /> Myntra-approved.
+              Pre-loved fashion,
+              <br /> Myntra-approved.
             </h1>
             <p className="mt-4 max-w-md text-white/85">
-              Every listing is AI Verified against original purchase records and Doorstep Inspected before delivery. Great brands, honest grades, zero surprises.
+              Every listing is AI Verified against original purchase records and Doorstep Inspected
+              before delivery. Great brands, honest grades, zero surprises.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <a href="#feed" className="inline-flex items-center gap-2 rounded-md bg-white px-5 py-3 text-sm font-bold uppercase tracking-wide text-primary hover:bg-white/90">
+              <a
+                href="#feed"
+                className="inline-flex items-center gap-2 rounded-md bg-white px-5 py-3 text-sm font-bold uppercase tracking-wide text-primary hover:bg-white/90"
+              >
                 Shop the drop <ArrowRight className="h-4 w-4" />
               </a>
-              <Link to="/orders" className="inline-flex items-center gap-2 rounded-md border border-white/50 px-5 py-3 text-sm font-bold uppercase tracking-wide hover:bg-white/10">
+              <Link
+                to="/orders"
+                className="inline-flex items-center gap-2 rounded-md border border-white/50 px-5 py-3 text-sm font-bold uppercase tracking-wide hover:bg-white/10"
+              >
                 Resell your Myntra order
               </Link>
             </div>
@@ -54,7 +62,9 @@ function Index() {
                 <div key={s.v} className="rounded-md bg-white/10 p-3 backdrop-blur">
                   <s.icon className="mx-auto h-5 w-5" />
                   <div className="mt-1 text-lg font-black">{s.k}</div>
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-white/80">{s.v}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-white/80">
+                    {s.v}
+                  </div>
                 </div>
               ))}
             </div>
@@ -77,16 +87,26 @@ function Index() {
       {/* Trust strip */}
       <div className="border-b border-border bg-muted/40">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-around gap-4 px-6 py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-verified" /> AI Product Verification</span>
-          <span className="flex items-center gap-2"><PackageCheck className="h-4 w-4 text-success" /> Doorstep Inspection</span>
-          <span className="flex items-center gap-2"><Recycle className="h-4 w-4 text-primary" /> Escrow-Protected Payments</span>
-          <span className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Original Purchase Match</span>
+          <span className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-verified" /> AI Product Verification
+          </span>
+          <span className="flex items-center gap-2">
+            <PackageCheck className="h-4 w-4 text-success" /> Doorstep Inspection
+          </span>
+          <span className="flex items-center gap-2">
+            <Recycle className="h-4 w-4 text-primary" /> Escrow-Protected Payments
+          </span>
+          <span className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" /> Original Purchase Match
+          </span>
         </div>
       </div>
 
       {/* Categories */}
       <section className="mx-auto max-w-7xl px-6 py-10">
-        <h2 className="text-center text-2xl font-black uppercase tracking-wider">Shop by Category</h2>
+        <h2 className="text-center text-2xl font-black uppercase tracking-wider">
+          Shop by Category
+        </h2>
         <div className="mt-6 grid grid-cols-4 gap-4 md:grid-cols-8">
           {categories.map((c) => (
             <div key={c.label} className="group flex flex-col items-center">
@@ -104,16 +124,25 @@ function Index() {
         <div className="flex items-end justify-between border-b border-border pb-3">
           <div>
             <h2 className="text-2xl font-black uppercase tracking-wider">Trending Pre-Loved</h2>
-            <p className="text-xs text-muted-foreground">{products.length} verified items · updated live</p>
+            <p className="text-xs text-muted-foreground">
+              {products.length} verified items · updated live
+            </p>
           </div>
           <div className="hidden gap-2 text-xs font-semibold uppercase tracking-wide md:flex">
             {["Recommended", "New in", "Price ↑", "Price ↓", "Discount"].map((f, i) => (
-              <button key={f} className={`rounded-full border px-3 py-1.5 ${i === 0 ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-foreground"}`}>{f}</button>
+              <button
+                key={f}
+                className={`rounded-full border px-3 py-1.5 ${i === 0 ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-foreground"}`}
+              >
+                {f}
+              </button>
             ))}
           </div>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-6 md:grid-cols-4">
-          {products.map((p) => <ProductCard key={p.id} p={p} />)}
+          {products.map((p) => (
+            <ProductCard key={p.id} p={p} />
+          ))}
         </div>
       </section>
 
@@ -121,12 +150,20 @@ function Index() {
       <section className="border-t border-border bg-accent/50">
         <div className="mx-auto grid max-w-7xl items-center gap-6 px-6 py-14 md:grid-cols-[1.2fr_1fr]">
           <div>
-            <span className="text-xs font-bold uppercase tracking-widest text-primary">Turn your closet into cash</span>
-            <h2 className="mt-2 text-3xl font-black md:text-4xl">Resell your Myntra order in 3 taps.</h2>
+            <span className="text-xs font-bold uppercase tracking-widest text-primary">
+              Turn your closet into cash
+            </span>
+            <h2 className="mt-2 text-3xl font-black md:text-4xl">
+              Resell your Myntra order in 3 taps.
+            </h2>
             <p className="mt-3 max-w-lg text-muted-foreground">
-              Pick an eligible order, upload photos with in-app capture guidance, and we handle verification, pickup, doorstep inspection and payout. Keep 60% of the final price.
+              Pick an eligible order, upload photos with in-app capture guidance, and we handle
+              verification, pickup, doorstep inspection and payout. Keep 60% of the final price.
             </p>
-            <Link to="/orders" className="mt-5 inline-flex items-center gap-2 rounded-md bg-primary px-5 py-3 text-sm font-bold uppercase tracking-wide text-primary-foreground hover:bg-primary/90">
+            <Link
+              to="/orders"
+              className="mt-5 inline-flex items-center gap-2 rounded-md bg-primary px-5 py-3 text-sm font-bold uppercase tracking-wide text-primary-foreground hover:bg-primary/90"
+            >
               Start selling <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -137,7 +174,9 @@ function Index() {
               { k: "3", t: "Get paid", d: "After doorstep inspection" },
             ].map((s) => (
               <div key={s.k} className="rounded-md border border-border bg-card p-4 shadow-card">
-                <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">{s.k}</div>
+                <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  {s.k}
+                </div>
                 <div className="mt-2 font-bold uppercase">{s.t}</div>
                 <div className="mt-1 text-[11px] font-normal text-muted-foreground">{s.d}</div>
               </div>

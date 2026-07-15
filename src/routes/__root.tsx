@@ -49,12 +49,20 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         </p>
         <div className="mt-6 flex justify-center gap-2">
           <button
-            onClick={() => { router.invalidate(); reset(); }}
+            onClick={() => {
+              router.invalidate();
+              reset();
+            }}
             className="rounded-md bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
           >
             Try again
           </button>
-          <a href="/" className="rounded-md border border-input bg-background px-4 py-2 text-sm font-medium">Go home</a>
+          <a
+            href="/"
+            className="rounded-md border border-input bg-background px-4 py-2 text-sm font-medium"
+          >
+            Go home
+          </a>
         </div>
       </div>
     </div>
@@ -67,23 +75,46 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "ReSell by Myntra — Premium Thrift & Recycle Marketplace" },
-      { name: "description", content: "Buy and sell pre-loved premium fashion. Every item AI Verified and Doorstep Inspected before delivery." },
+      {
+        name: "description",
+        content:
+          "Buy and sell pre-loved premium fashion. Every item AI Verified and Doorstep Inspected before delivery.",
+      },
       { name: "author", content: "Myntra Hackerramp" },
       { property: "og:title", content: "ReSell by Myntra — Premium Thrift & Recycle Marketplace" },
-      { property: "og:description", content: "Buy and sell pre-loved premium fashion. Every item AI Verified and Doorstep Inspected before delivery." },
+      {
+        property: "og:description",
+        content:
+          "Buy and sell pre-loved premium fashion. Every item AI Verified and Doorstep Inspected before delivery.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "ReSell by Myntra — Premium Thrift & Recycle Marketplace" },
-      { name: "twitter:description", content: "Buy and sell pre-loved premium fashion. Every item AI Verified and Doorstep Inspected before delivery." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/a7c87d18-b578-4bf0-a952-28c164b97ce3/id-preview-dc689659--8e4ad3c0-42ac-43b9-a7d8-083c523a20de.lovable.app-1784044094608.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/a7c87d18-b578-4bf0-a952-28c164b97ce3/id-preview-dc689659--8e4ad3c0-42ac-43b9-a7d8-083c523a20de.lovable.app-1784044094608.png" },
+      {
+        name: "twitter:description",
+        content:
+          "Buy and sell pre-loved premium fashion. Every item AI Verified and Doorstep Inspected before delivery.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/a7c87d18-b578-4bf0-a952-28c164b97ce3/id-preview-dc689659--8e4ad3c0-42ac-43b9-a7d8-083c523a20de.lovable.app-1784044094608.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/a7c87d18-b578-4bf0-a952-28c164b97ce3/id-preview-dc689659--8e4ad3c0-42ac-43b9-a7d8-083c523a20de.lovable.app-1784044094608.png",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&display=swap",
+      },
     ],
   }),
   shellComponent: RootShell,
@@ -117,4 +148,3 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
-

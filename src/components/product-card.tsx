@@ -30,11 +30,7 @@ export function ProductCard({ p }: { p: Product }) {
         </button>
         <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
           {p.verified && <TrustBadge kind="verified" />}
-          {p.inspected ? (
-            <TrustBadge kind="inspected" />
-          ) : (
-            <TrustBadge kind="inspection-pending" />
-          )}
+          {p.inspected ? <TrustBadge kind="inspected" /> : <TrustBadge kind="inspection-pending" />}
         </div>
       </div>
       <div className="p-2">
@@ -42,13 +38,11 @@ export function ProductCard({ p }: { p: Product }) {
         <div className="truncate text-xs text-muted-foreground">{p.title}</div>
         <div className="mt-1 flex items-baseline gap-1.5">
           <span className="text-sm font-bold">{inr(price.listPrice)}</span>
-          <span className="text-xs text-muted-foreground line-through">
-            {inr(p.originalPrice)}
-          </span>
+          <span className="text-xs text-muted-foreground line-through">{inr(p.originalPrice)}</span>
           <span className="text-xs font-semibold text-primary">({discount}% OFF)</span>
         </div>
         <div className="mt-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-          {(p.confirmedGrade ?? p.declaredGrade)} · Size {p.size}
+          {p.confirmedGrade ?? p.declaredGrade} · Size {p.size}
         </div>
       </div>
     </Link>

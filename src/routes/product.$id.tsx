@@ -2,7 +2,16 @@ import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-ro
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { TrustBadge } from "@/components/trust-badges";
 import { computePrice, inr, products } from "@/lib/mock-data";
-import { Heart, Share2, ShieldCheck, PackageCheck, Recycle, Star, Truck, RotateCcw } from "lucide-react";
+import {
+  Heart,
+  Share2,
+  ShieldCheck,
+  PackageCheck,
+  Recycle,
+  Star,
+  Truck,
+  RotateCcw,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -18,15 +27,26 @@ export const Route = createFileRoute("/product/$id")({
     meta: loaderData
       ? [
           { title: `${loaderData.product.brand} ${loaderData.product.title} — ReSell` },
-          { name: "description", content: `Pre-loved ${loaderData.product.brand} ${loaderData.product.title}. AI Verified and Doorstep Inspected on ReSell by Myntra.` },
-          { property: "og:title", content: `${loaderData.product.brand} · ${loaderData.product.title}` },
+          {
+            name: "description",
+            content: `Pre-loved ${loaderData.product.brand} ${loaderData.product.title}. AI Verified and Doorstep Inspected on ReSell by Myntra.`,
+          },
+          {
+            property: "og:title",
+            content: `${loaderData.product.brand} · ${loaderData.product.title}`,
+          },
           { property: "og:image", content: loaderData.product.image },
         ]
       : [],
   }),
   component: ProductPage,
   notFoundComponent: () => (
-    <div className="p-20 text-center">Product not found. <Link to="/" className="text-primary underline">Back home</Link></div>
+    <div className="p-20 text-center">
+      Product not found.{" "}
+      <Link to="/" className="text-primary underline">
+        Back home
+      </Link>
+    </div>
   ),
 });
 
@@ -42,8 +62,17 @@ function ProductPage() {
   const [busy, setBusy] = useState<"" | "bag" | "wish">("");
 
   useEffect(() => {
-    if (!user) { setWished(false); return; }
-    supabase.from("wishlist_items").select("id").eq("user_id", user.id).eq("product_id", p.id).maybeSingle().then(({ data }) => setWished(!!data));
+    if (!user) {
+      setWished(false);
+      return;
+    }
+    supabase
+      .from("wishlist_items")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("product_id", p.id)
+      .maybeSingle()
+      .then(({ data }) => setWished(!!data));
   }, [user, p.id]);
 
   const needAuth = () => {
@@ -54,23 +83,32 @@ function ProductPage() {
   const addToBag = async () => {
     if (!user) return needAuth();
     setBusy("bag");
-    const { error } = await supabase.from("bag_items").upsert({
-      user_id: user.id,
-      product_id: p.id,
-      product_data: p as any,
-      size: p.size,
-      quantity: 1,
-    }, { onConflict: "user_id,product_id" });
+    const { error } = await supabase.from("bag_items").upsert(
+      {
+        user_id: user.id,
+        product_id: p.id,
+        product_data: p as any,
+        size: p.size,
+        quantity: 1,
+      },
+      { onConflict: "user_id,product_id" },
+    );
     setBusy("");
     if (error) return toast.error(error.message);
-    toast.success("Added to bag", { action: { label: "View bag", onClick: () => navigate({ to: "/bag" }) } });
+    toast.success("Added to bag", {
+      action: { label: "View bag", onClick: () => navigate({ to: "/bag" }) },
+    });
   };
 
   const toggleWishlist = async () => {
     if (!user) return needAuth();
     setBusy("wish");
     if (wished) {
-      const { error } = await supabase.from("wishlist_items").delete().eq("user_id", user.id).eq("product_id", p.id);
+      const { error } = await supabase
+        .from("wishlist_items")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("product_id", p.id);
       setBusy("");
       if (error) return toast.error(error.message);
       setWished(false);
@@ -87,7 +125,6 @@ function ProductPage() {
       toast.success("Added to wishlist");
     }
   };
-
 
   return (
     <div className="min-h-screen bg-background">
@@ -129,14 +166,17 @@ function ProductPage() {
 
           <div className="mt-4 flex items-baseline gap-2">
             <span className="text-3xl font-black">{inr(price.listPrice)}</span>
-            <span className="text-sm text-muted-foreground line-through">{inr(p.originalPrice)}</span>
+            <span className="text-sm text-muted-foreground line-through">
+              {inr(p.originalPrice)}
+            </span>
             <span className="text-sm font-bold text-primary">({discount}% OFF)</span>
           </div>
           <div className="text-xs font-semibold text-success">inclusive of all taxes</div>
 
           {!p.inspected && (
             <div className="mt-3 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs">
-              <b>AI-estimated price</b> — final price is confirmed after doorstep inspection. If the grade drops, we'll notify you before charging.
+              <b>AI-estimated price</b> — final price is confirmed after doorstep inspection. If the
+              grade drops, we'll notify you before charging.
             </div>
           )}
 
@@ -153,31 +193,59 @@ function ProductPage() {
                 </button>
               ))}
             </div>
-            <div className="mt-1 text-[11px] text-muted-foreground">Only this size is available for this pre-loved item.</div>
+            <div className="mt-1 text-[11px] text-muted-foreground">
+              Only this size is available for this pre-loved item.
+            </div>
           </div>
 
           <div className="mt-6 flex gap-3">
-            <button onClick={addToBag} disabled={busy === "bag"} className="flex-1 rounded-md bg-primary py-3.5 text-sm font-bold uppercase tracking-wide text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+            <button
+              onClick={addToBag}
+              disabled={busy === "bag"}
+              className="flex-1 rounded-md bg-primary py-3.5 text-sm font-bold uppercase tracking-wide text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
               {busy === "bag" ? "Adding…" : "Add to Bag"}
             </button>
-            <button onClick={toggleWishlist} disabled={busy === "wish"} className={`flex items-center gap-2 rounded-md border px-5 py-3.5 text-sm font-bold uppercase tracking-wide ${wished ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-foreground"}`}>
-              <Heart className={`h-4 w-4 ${wished ? "fill-primary" : ""}`} /> {wished ? "Wishlisted" : "Wishlist"}
+            <button
+              onClick={toggleWishlist}
+              disabled={busy === "wish"}
+              className={`flex items-center gap-2 rounded-md border px-5 py-3.5 text-sm font-bold uppercase tracking-wide ${wished ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-foreground"}`}
+            >
+              <Heart className={`h-4 w-4 ${wished ? "fill-primary" : ""}`} />{" "}
+              {wished ? "Wishlisted" : "Wishlist"}
             </button>
-            <button aria-label="Share" className="rounded-md border border-border p-3.5 hover:border-foreground">
+            <button
+              aria-label="Share"
+              className="rounded-md border border-border p-3.5 hover:border-foreground"
+            >
               <Share2 className="h-4 w-4" />
             </button>
           </div>
 
-
           {/* Trust panel */}
           <div className="mt-6 rounded-md border border-border bg-card p-4">
-            <div className="text-xs font-bold uppercase tracking-wider">Why you can trust this listing</div>
+            <div className="text-xs font-bold uppercase tracking-wider">
+              Why you can trust this listing
+            </div>
             <div className="mt-3 grid gap-3 text-sm">
-              <TrustRow icon={ShieldCheck} title="AI Product Verification passed" note="Matched against original Myntra purchase record, quality gate cleared, no duplicate/stock photos detected." color="text-verified" />
+              <TrustRow
+                icon={ShieldCheck}
+                title="AI Product Verification passed"
+                note="Matched against original Myntra purchase record, quality gate cleared, no duplicate/stock photos detected."
+                color="text-verified"
+              />
               <TrustRow
                 icon={PackageCheck}
-                title={p.inspected ? `Doorstep Inspected · Grade ${grade}` : `Inspection pending · Declared ${grade}`}
-                note={p.inspected ? "Stretch, Light and Odor tests confirmed by our delivery partner." : "Stretch, Light and Odor tests happen on pickup. Price locks after inspection."}
+                title={
+                  p.inspected
+                    ? `Doorstep Inspected · Grade ${grade}`
+                    : `Inspection pending · Declared ${grade}`
+                }
+                note={
+                  p.inspected
+                    ? "Stretch, Light and Odor tests confirmed by our delivery partner."
+                    : "Stretch, Light and Odor tests happen on pickup. Price locks after inspection."
+                }
                 color="text-success"
               />
               {p.confirmedGrade && p.confirmedGrade !== p.declaredGrade && (
@@ -197,14 +265,18 @@ function ProductPage() {
               <Truck className="mt-0.5 h-4 w-4 text-primary" />
               <div>
                 <div className="font-bold">Free delivery in 4–6 days</div>
-                <div className="text-xs text-muted-foreground">Escrow protected · pay only after inspection</div>
+                <div className="text-xs text-muted-foreground">
+                  Escrow protected · pay only after inspection
+                </div>
               </div>
             </div>
             <div className="flex items-start gap-2">
               <RotateCcw className="mt-0.5 h-4 w-4 text-primary" />
               <div>
                 <div className="font-bold">48h Buyer Protection</div>
-                <div className="text-xs text-muted-foreground">Raise a dispute within 48h of delivery</div>
+                <div className="text-xs text-muted-foreground">
+                  Raise a dispute within 48h of delivery
+                </div>
               </div>
             </div>
           </div>
@@ -214,7 +286,10 @@ function ProductPage() {
             <summary className="cursor-pointer font-bold">How this price was computed</summary>
             <div className="mt-3 space-y-1 text-xs">
               <Row label="Original Myntra price" value={inr(p.originalPrice)} />
-              <Row label={`Depreciation · ${p.ageYears} yr × 20%`} value={`× ${price.depreciation.toFixed(2)}`} />
+              <Row
+                label={`Depreciation · ${p.ageYears} yr × 20%`}
+                value={`× ${price.depreciation.toFixed(2)}`}
+              />
               <Row label={`Grade factor · ${grade}`} value={`× ${price.factor.toFixed(2)}`} />
               <div className="my-2 border-t border-border" />
               <Row label="Final listing price" value={inr(price.listPrice)} bold />
@@ -243,7 +318,9 @@ function TrustRow({ icon: Icon, title, note, color }: any) {
 
 function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
-    <div className={`flex justify-between ${bold ? "font-bold text-foreground" : "text-muted-foreground"}`}>
+    <div
+      className={`flex justify-between ${bold ? "font-bold text-foreground" : "text-muted-foreground"}`}
+    >
       <span>{label}</span>
       <span>{value}</span>
     </div>

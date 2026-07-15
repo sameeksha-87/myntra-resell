@@ -141,7 +141,9 @@ function AuthPage() {
 
           <p className="mt-4 text-center text-xs text-muted-foreground">
             By continuing you agree to our terms and privacy policy.{" "}
-            <Link to="/" className="text-primary">Back home</Link>
+            <Link to="/" className="text-primary">
+              Back home
+            </Link>
           </p>
         </div>
       </div>
@@ -153,7 +155,9 @@ function AuthPage() {
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
       {children}
     </label>
   );

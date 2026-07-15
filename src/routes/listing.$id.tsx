@@ -28,12 +28,28 @@ type Listing = {
 const stageOrder = ["verifying", "live", "sold", "pickup", "inspection", "paid"] as const;
 
 const stageMeta = {
-  verifying: { label: "Verifying", icon: ShieldCheck, note: "AI Verification passed · high confidence" },
-  live: { label: "Live in marketplace", icon: Sparkles, note: "Visible to buyers · boosted by 4.8★ seller score" },
+  verifying: {
+    label: "Verifying",
+    icon: ShieldCheck,
+    note: "AI Verification passed · high confidence",
+  },
+  live: {
+    label: "Live in marketplace",
+    icon: Sparkles,
+    note: "Visible to buyers · boosted by 4.8★ seller score",
+  },
   sold: { label: "Sold", icon: Wallet, note: "Buyer paid · held in escrow" },
   pickup: { label: "Pickup scheduled", icon: Truck, note: "Tomorrow · 10 AM – 12 PM slot" },
-  inspection: { label: "Doorstep inspection", icon: PackageCheck, note: "Stretch · Light · Odor tests on arrival" },
-  paid: { label: "Payout released", icon: Check, note: "60% credited as Myntra Credits after 48h protection" },
+  inspection: {
+    label: "Doorstep inspection",
+    icon: PackageCheck,
+    note: "Stretch · Light · Odor tests on arrival",
+  },
+  paid: {
+    label: "Payout released",
+    icon: Check,
+    note: "60% credited as Myntra Credits after 48h protection",
+  },
 };
 
 function ListingStatus() {
@@ -47,10 +63,15 @@ function ListingStatus() {
       setLoaded(true);
       return;
     }
-    supabase.from("listings").select("*").eq("id", id).maybeSingle().then(({ data }) => {
-      if (data) setListing(data as Listing);
-      setLoaded(true);
-    });
+    supabase
+      .from("listings")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setListing(data as Listing);
+        setLoaded(true);
+      });
   }, [id]);
 
   const status = listing?.status ?? "sold";
@@ -75,7 +96,9 @@ function ListingStatus() {
               : "Your item just sold 🎉"}
           </h1>
           <p className="mt-1 text-sm text-white/85">
-            {listing ? `Listed at ${inr(listing.ask_price)} · payout ${inr(listing.seller_payout)}` : "Payment is held in escrow. Pickup is scheduled for tomorrow morning."}
+            {listing
+              ? `Listed at ${inr(listing.ask_price)} · payout ${inr(listing.seller_payout)}`
+              : "Payment is held in escrow. Pickup is scheduled for tomorrow morning."}
           </p>
         </div>
       </section>
@@ -93,12 +116,20 @@ function ListingStatus() {
                 <li key={key} className="mb-6 last:mb-0">
                   <span
                     className={`absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full border-2 ${
-                      done ? "border-success bg-success text-white" : active ? "border-primary bg-primary text-white" : "border-border bg-background text-muted-foreground"
+                      done
+                        ? "border-success bg-success text-white"
+                        : active
+                          ? "border-primary bg-primary text-white"
+                          : "border-border bg-background text-muted-foreground"
                     }`}
                   >
                     {done ? <Check className="h-3 w-3" /> : <Icon className="h-3 w-3" />}
                   </span>
-                  <div className={`text-sm font-bold ${active ? "text-primary" : done ? "text-foreground" : "text-muted-foreground"}`}>{s.label}</div>
+                  <div
+                    className={`text-sm font-bold ${active ? "text-primary" : done ? "text-foreground" : "text-muted-foreground"}`}
+                  >
+                    {s.label}
+                  </div>
                   <div className="text-xs text-muted-foreground">{s.note}</div>
                   {active && (
                     <div className="mt-2 inline-flex items-center gap-1 rounded-sm bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
@@ -122,23 +153,39 @@ function ListingStatus() {
               <Sparkles className="h-4 w-4" /> Grade-Mismatch Policy
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              If the inspector revises your grade downwards, we recompute the price transparently and give the buyer a chance to accept before charging.
+              If the inspector revises your grade downwards, we recompute the price transparently
+              and give the buyer a chance to accept before charging.
             </p>
           </div>
 
           <div className="rounded-md border border-border bg-card p-4 shadow-card">
-            <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Provisional Payout</div>
-            <div className="mt-1 text-2xl font-black">{listing ? inr(listing.seller_payout) : "₹3,672"}</div>
-            <div className="text-xs text-muted-foreground">60% of {listing ? inr(listing.ask_price) : "₹6,120"} · after 48h buyer protection</div>
+            <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              Provisional Payout
+            </div>
+            <div className="mt-1 text-2xl font-black">
+              {listing ? inr(listing.seller_payout) : "₹3,672"}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              60% of {listing ? inr(listing.ask_price) : "₹6,120"} · after 48h buyer protection
+            </div>
             <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-              <div className="h-full bg-primary" style={{ width: `${Math.min(100, ((currentIdx + 1) / stageOrder.length) * 100)}%` }} />
+              <div
+                className="h-full bg-primary"
+                style={{ width: `${Math.min(100, ((currentIdx + 1) / stageOrder.length) * 100)}%` }}
+              />
             </div>
             <div className="mt-1 flex justify-between text-[10px] uppercase text-muted-foreground">
-              <span>Verifying</span><span>Live</span><span>Sold</span><span>Paid</span>
+              <span>Verifying</span>
+              <span>Live</span>
+              <span>Sold</span>
+              <span>Paid</span>
             </div>
           </div>
 
-          <Link to="/orders" className="block rounded-md border border-border bg-card p-4 text-center text-sm font-bold uppercase tracking-wide hover:border-primary">
+          <Link
+            to="/orders"
+            className="block rounded-md border border-border bg-card p-4 text-center text-sm font-bold uppercase tracking-wide hover:border-primary"
+          >
             List another item
           </Link>
         </aside>

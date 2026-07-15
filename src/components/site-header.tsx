@@ -56,9 +56,7 @@ export function SiteHeader() {
             >
               {n.label}
               {n.tag && (
-                <span className="ml-1 align-super text-[9px] font-bold text-primary">
-                  {n.tag}
-                </span>
+                <span className="ml-1 align-super text-[9px] font-bold text-primary">{n.tag}</span>
               )}
               <span className="absolute inset-x-0 -bottom-0.5 h-0.5 scale-x-0 bg-primary transition-transform group-hover:scale-x-100" />
             </Link>
@@ -83,39 +81,80 @@ export function SiteHeader() {
           <div className="relative hidden md:block" ref={menuRef}>
             {user ? (
               <>
-                <button onClick={() => setOpen((v) => !v)} className="flex flex-col items-center text-[10px] font-semibold text-foreground/80 hover:text-primary">
+                <button
+                  onClick={() => setOpen((v) => !v)}
+                  className="flex flex-col items-center text-[10px] font-semibold text-foreground/80 hover:text-primary"
+                >
                   <User className="h-5 w-5" />
                   Profile
                 </button>
                 {open && (
                   <div className="absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-md border border-border bg-popover shadow-lg">
                     <div className="border-b border-border px-3 py-2">
-                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Signed in</div>
+                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                        Signed in
+                      </div>
                       <div className="truncate text-sm font-semibold">{user.email}</div>
                     </div>
-                    <Link to="/profile" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm hover:bg-muted">My Profile</Link>
-                    <Link to="/orders" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm hover:bg-muted">Orders & Listings</Link>
-                    <Link to="/wishlist" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm hover:bg-muted">Wishlist</Link>
-                    <Link to="/bag" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm hover:bg-muted">Bag</Link>
-                    <button onClick={signOut} className="flex w-full items-center gap-2 border-t border-border px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted hover:text-destructive">
+                    <Link
+                      to="/profile"
+                      onClick={() => setOpen(false)}
+                      className="block px-3 py-2 text-sm hover:bg-muted"
+                    >
+                      My Profile
+                    </Link>
+                    <Link
+                      to="/orders"
+                      onClick={() => setOpen(false)}
+                      className="block px-3 py-2 text-sm hover:bg-muted"
+                    >
+                      Orders & Listings
+                    </Link>
+                    <Link
+                      to="/wishlist"
+                      onClick={() => setOpen(false)}
+                      className="block px-3 py-2 text-sm hover:bg-muted"
+                    >
+                      Wishlist
+                    </Link>
+                    <Link
+                      to="/bag"
+                      onClick={() => setOpen(false)}
+                      className="block px-3 py-2 text-sm hover:bg-muted"
+                    >
+                      Bag
+                    </Link>
+                    <button
+                      onClick={signOut}
+                      className="flex w-full items-center gap-2 border-t border-border px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted hover:text-destructive"
+                    >
                       <LogOut className="h-3 w-3" /> Sign out
                     </button>
                   </div>
                 )}
               </>
             ) : (
-              <Link to="/auth" className="flex flex-col items-center text-[10px] font-semibold text-foreground/80 hover:text-primary">
+              <Link
+                to="/auth"
+                className="flex flex-col items-center text-[10px] font-semibold text-foreground/80 hover:text-primary"
+              >
                 <User className="h-5 w-5" />
                 Sign in
               </Link>
             )}
           </div>
 
-          <Link to="/wishlist" className="hidden flex-col items-center text-[10px] font-semibold text-foreground/80 hover:text-primary md:flex">
+          <Link
+            to="/wishlist"
+            className="hidden flex-col items-center text-[10px] font-semibold text-foreground/80 hover:text-primary md:flex"
+          >
             <Heart className="h-5 w-5" />
             Wishlist
           </Link>
-          <Link to="/bag" className="flex flex-col items-center text-[10px] font-semibold text-foreground/80 hover:text-primary">
+          <Link
+            to="/bag"
+            className="flex flex-col items-center text-[10px] font-semibold text-foreground/80 hover:text-primary"
+          >
             <ShoppingBag className="h-5 w-5" />
             Bag
           </Link>
@@ -134,26 +173,38 @@ export function SiteFooter() {
             <span className="text-primary">Re</span>Sell
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
-            India's trusted marketplace for pre-loved premium fashion. Every item AI Verified and Doorstep Inspected.
+            India's trusted marketplace for pre-loved premium fashion. Every item AI Verified and
+            Doorstep Inspected.
           </p>
         </div>
         <div>
           <div className="text-xs font-bold uppercase tracking-wider">Shop</div>
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-            <li>Women</li><li>Men</li><li>Sneakers</li><li>Luxury</li>
+            <li>Women</li>
+            <li>Men</li>
+            <li>Sneakers</li>
+            <li>Luxury</li>
           </ul>
         </div>
         <div>
           <div className="text-xs font-bold uppercase tracking-wider">Sell</div>
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-            <li><Link to="/orders" className="hover:text-primary">Start a listing</Link></li>
-            <li>How pricing works</li><li>Doorstep inspection</li><li>Seller protection</li>
+            <li>
+              <Link to="/orders" className="hover:text-primary">
+                Start a listing
+              </Link>
+            </li>
+            <li>How pricing works</li>
+            <li>Doorstep inspection</li>
+            <li>Seller protection</li>
           </ul>
         </div>
         <div>
           <div className="text-xs font-bold uppercase tracking-wider">Trust</div>
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-            <li>AI Verification</li><li>Buyer Protection · 48h</li><li>Escrow Payments</li>
+            <li>AI Verification</li>
+            <li>Buyer Protection · 48h</li>
+            <li>Escrow Payments</li>
           </ul>
         </div>
       </div>

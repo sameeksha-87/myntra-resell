@@ -234,6 +234,17 @@ export const eligibleOrders: EligibleOrder[] = [
     ageYears: 1,
     image: img("order-104"),
   },
+  {
+    orderId: "o-105",
+    brand: "Roadster",
+    title: "Casual Solid Cotton Shirt",
+    category: "Shirts",
+    size: "M",
+    originalPrice: 2499,
+    purchaseDate: "May 2025",
+    ageYears: 1,
+    image: img("order-105"),
+  },
 ];
 
 export const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
