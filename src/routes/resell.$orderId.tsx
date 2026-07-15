@@ -127,7 +127,7 @@ function ResellFlow() {
           )}
           {step === 4 && (
             <LiveStep
-              onView={() => navigate({ to: "/listing/$id", params: { id: order.orderId } })}
+              onView={() => navigate({ to: "/listing/$id", params: { id: listingId ?? order.orderId } })}
             />
           )}
         </div>
