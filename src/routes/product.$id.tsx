@@ -1,9 +1,12 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { TrustBadge } from "@/components/trust-badges";
 import { computePrice, inr, products } from "@/lib/mock-data";
 import { Heart, Share2, ShieldCheck, PackageCheck, Recycle, Star, Truck, RotateCcw } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth-context";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/product/$id")({
   loader: ({ params }) => {
@@ -33,6 +36,58 @@ function ProductPage() {
   const price = computePrice(p.originalPrice, p.ageYears, grade);
   const discount = Math.round((1 - price.listPrice / p.originalPrice) * 100);
   const [active, setActive] = useState(0);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [wished, setWished] = useState(false);
+  const [busy, setBusy] = useState<"" | "bag" | "wish">("");
+
+  useEffect(() => {
+    if (!user) { setWished(false); return; }
+    supabase.from("wishlist_items").select("id").eq("user_id", user.id).eq("product_id", p.id).maybeSingle().then(({ data }) => setWished(!!data));
+  }, [user, p.id]);
+
+  const needAuth = () => {
+    toast.info("Sign in to save items");
+    navigate({ to: "/auth", search: { redirect: window.location.pathname } });
+  };
+
+  const addToBag = async () => {
+    if (!user) return needAuth();
+    setBusy("bag");
+    const { error } = await supabase.from("bag_items").upsert({
+      user_id: user.id,
+      product_id: p.id,
+      product_data: p as any,
+      size: p.size,
+      quantity: 1,
+    }, { onConflict: "user_id,product_id" });
+    setBusy("");
+    if (error) return toast.error(error.message);
+    toast.success("Added to bag", { action: { label: "View bag", onClick: () => navigate({ to: "/bag" }) } });
+  };
+
+  const toggleWishlist = async () => {
+    if (!user) return needAuth();
+    setBusy("wish");
+    if (wished) {
+      const { error } = await supabase.from("wishlist_items").delete().eq("user_id", user.id).eq("product_id", p.id);
+      setBusy("");
+      if (error) return toast.error(error.message);
+      setWished(false);
+      toast.success("Removed from wishlist");
+    } else {
+      const { error } = await supabase.from("wishlist_items").insert({
+        user_id: user.id,
+        product_id: p.id,
+        product_data: p as any,
+      });
+      setBusy("");
+      if (error) return toast.error(error.message);
+      setWished(true);
+      toast.success("Added to wishlist");
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -102,16 +157,17 @@ function ProductPage() {
           </div>
 
           <div className="mt-6 flex gap-3">
-            <button className="flex-1 rounded-md bg-primary py-3.5 text-sm font-bold uppercase tracking-wide text-primary-foreground hover:bg-primary/90">
-              Add to Bag
+            <button onClick={addToBag} disabled={busy === "bag"} className="flex-1 rounded-md bg-primary py-3.5 text-sm font-bold uppercase tracking-wide text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+              {busy === "bag" ? "Adding…" : "Add to Bag"}
             </button>
-            <button className="flex items-center gap-2 rounded-md border border-border px-5 py-3.5 text-sm font-bold uppercase tracking-wide hover:border-foreground">
-              <Heart className="h-4 w-4" /> Wishlist
+            <button onClick={toggleWishlist} disabled={busy === "wish"} className={`flex items-center gap-2 rounded-md border px-5 py-3.5 text-sm font-bold uppercase tracking-wide ${wished ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-foreground"}`}>
+              <Heart className={`h-4 w-4 ${wished ? "fill-primary" : ""}`} /> {wished ? "Wishlisted" : "Wishlist"}
             </button>
             <button aria-label="Share" className="rounded-md border border-border p-3.5 hover:border-foreground">
               <Share2 className="h-4 w-4" />
             </button>
           </div>
+
 
           {/* Trust panel */}
           <div className="mt-6 rounded-md border border-border bg-card p-4">
