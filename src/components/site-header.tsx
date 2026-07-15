@@ -1,5 +1,9 @@
-import { Link } from "@tanstack/react-router";
-import { Search, Heart, ShoppingBag, User, Sparkles } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { Search, Heart, ShoppingBag, User, Sparkles, LogOut } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useState, useRef, useEffect } from "react";
 
 const nav = [
   { label: "MEN", to: "/" },
@@ -11,6 +15,26 @@ const nav = [
 ];
 
 export function SiteHeader() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setOpen(false);
+    toast.success("Signed out");
+    navigate({ to: "/", replace: true });
+  };
+
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-8 px-4 md:px-6">
@@ -55,18 +79,46 @@ export function SiteHeader() {
               className="h-10 w-full rounded-md bg-muted pl-9 pr-3 text-sm outline-none ring-primary/20 focus:bg-background focus:ring-2"
             />
           </div>
-          <button className="hidden flex-col items-center text-[10px] font-semibold text-foreground/80 hover:text-primary md:flex">
-            <User className="h-5 w-5" />
-            Profile
-          </button>
-          <button className="hidden flex-col items-center text-[10px] font-semibold text-foreground/80 hover:text-primary md:flex">
+
+          <div className="relative hidden md:block" ref={menuRef}>
+            {user ? (
+              <>
+                <button onClick={() => setOpen((v) => !v)} className="flex flex-col items-center text-[10px] font-semibold text-foreground/80 hover:text-primary">
+                  <User className="h-5 w-5" />
+                  Profile
+                </button>
+                {open && (
+                  <div className="absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-md border border-border bg-popover shadow-lg">
+                    <div className="border-b border-border px-3 py-2">
+                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Signed in</div>
+                      <div className="truncate text-sm font-semibold">{user.email}</div>
+                    </div>
+                    <Link to="/profile" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm hover:bg-muted">My Profile</Link>
+                    <Link to="/orders" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm hover:bg-muted">Orders & Listings</Link>
+                    <Link to="/wishlist" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm hover:bg-muted">Wishlist</Link>
+                    <Link to="/bag" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm hover:bg-muted">Bag</Link>
+                    <button onClick={signOut} className="flex w-full items-center gap-2 border-t border-border px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted hover:text-destructive">
+                      <LogOut className="h-3 w-3" /> Sign out
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <Link to="/auth" className="flex flex-col items-center text-[10px] font-semibold text-foreground/80 hover:text-primary">
+                <User className="h-5 w-5" />
+                Sign in
+              </Link>
+            )}
+          </div>
+
+          <Link to="/wishlist" className="hidden flex-col items-center text-[10px] font-semibold text-foreground/80 hover:text-primary md:flex">
             <Heart className="h-5 w-5" />
             Wishlist
-          </button>
-          <button className="flex flex-col items-center text-[10px] font-semibold text-foreground/80 hover:text-primary">
+          </Link>
+          <Link to="/bag" className="flex flex-col items-center text-[10px] font-semibold text-foreground/80 hover:text-primary">
             <ShoppingBag className="h-5 w-5" />
             Bag
-          </button>
+          </Link>
         </div>
       </div>
     </header>
