@@ -37,20 +37,55 @@ const grades: { grade: Grade; blurb: string; example: string }[] = [
 function ResellFlow() {
   const { order } = Route.useLoaderData();
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
   const [step, setStep] = useState<Step>(0);
   const [photos, setPhotos] = useState<Record<string, boolean>>({});
   const [grade, setGrade] = useState<Grade>("Excellent");
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState(false);
+  const [listingId, setListingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate({ to: "/auth", search: { redirect: window.location.pathname }, replace: true });
+    }
+  }, [user, loading, navigate]);
 
   const photosDone = angles.filter((a) => photos[a.key]).length;
   const price = useMemo(() => computePrice(order.originalPrice, order.ageYears, grade), [order, grade]);
 
-  const startVerify = () => {
+  const startVerify = async () => {
+    if (!user) return;
     setStep(3);
     setVerifying(true);
-    setTimeout(() => { setVerifying(false); setVerified(true); }, 2200);
+    const { data, error } = await supabase.from("listings").insert({
+      user_id: user.id,
+      order_id: order.orderId,
+      brand: order.brand,
+      title: order.title,
+      image: order.image,
+      size: order.size,
+      category: order.category,
+      original_price: order.originalPrice,
+      ask_price: price.listPrice,
+      seller_payout: price.sellerPayout,
+      declared_grade: grade,
+      status: "verifying",
+    }).select("id").single();
+    if (error) {
+      toast.error(error.message);
+      setVerifying(false);
+      setStep(2);
+      return;
+    }
+    setListingId(data.id);
+    setTimeout(async () => {
+      await supabase.from("listings").update({ status: "live", updated_at: new Date().toISOString() }).eq("id", data.id);
+      setVerifying(false);
+      setVerified(true);
+    }, 2200);
   };
+
 
   return (
     <div className="min-h-screen bg-background">
