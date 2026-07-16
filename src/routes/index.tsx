@@ -2,7 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { ProductCard } from "@/components/product-card";
 import { products } from "@/lib/mock-data";
-import { ShieldCheck, PackageCheck, Recycle, Sparkles, ArrowRight } from "lucide-react";
+import { ShieldCheck, PackageCheck, Recycle, Sparkles, ArrowRight, Search, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { fetchListings } from "@/integrations/supabase/actions.server";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -20,6 +22,36 @@ const categories = [
 ];
 
 function Index() {
+  const [dbListings, setDbListings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Filters
+  const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [priceSort, setPriceSort] = useState<"asc" | "desc" | undefined>(undefined);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchListings({
+      category: selectedCategory,
+      priceSort: priceSort,
+      search: searchQuery || undefined,
+    })
+      .then((data) => {
+        setDbListings(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Error loading listings:", err);
+        setLoading(false);
+      });
+  }, [selectedCategory, priceSort, searchQuery]);
+
+  const handleCategoryClick = (catName: string) => {
+    setSelectedCategory(selectedCategory === catName ? undefined : catName);
+    document.getElementById("feed")?.scrollIntoView({ behavior: "smooth" });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader />
@@ -29,7 +61,7 @@ function Index() {
         <div className="mx-auto grid max-w-7xl gap-8 px-6 py-14 md:grid-cols-2 md:items-center md:py-20">
           <div>
             <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-widest backdrop-blur">
-              <Sparkles className="h-3 w-3" /> Premium Thrift · Recycle
+              <Sparkles className="h-3 w-3" /> Premium Thrift · Circular Fashion
             </span>
             <h1 className="mt-4 font-display text-4xl font-black leading-tight md:text-6xl">
               Pre-loved fashion,
@@ -109,41 +141,118 @@ function Index() {
         </h2>
         <div className="mt-6 grid grid-cols-4 gap-4 md:grid-cols-8">
           {categories.map((c) => (
-            <div key={c.label} className="group flex flex-col items-center">
-              <div className="aspect-square w-full overflow-hidden rounded-full border-2 border-transparent group-hover:border-primary">
+            <button
+              key={c.label}
+              onClick={() => handleCategoryClick(c.label)}
+              className={`group flex flex-col items-center cursor-pointer transition-all duration-200 ${selectedCategory === c.label ? "scale-105" : ""}`}
+            >
+              <div className={`aspect-square w-20 overflow-hidden rounded-full border-2 ${selectedCategory === c.label ? "border-primary shadow-lg scale-105" : "border-transparent group-hover:border-primary/50"}`}>
                 <img src={c.img} alt={c.label} className="h-full w-full object-cover" />
               </div>
-              <span className="mt-2 text-xs font-bold uppercase">{c.label}</span>
-            </div>
+              <span className={`mt-2 text-xs font-bold uppercase ${selectedCategory === c.label ? "text-primary font-black" : "text-foreground"}`}>{c.label}</span>
+            </button>
           ))}
         </div>
       </section>
 
       {/* Feed */}
-      <section id="feed" className="mx-auto max-w-7xl px-4 pb-16 md:px-6">
-        <div className="flex items-end justify-between border-b border-border pb-3">
+      <section id="feed" className="mx-auto max-w-7xl px-4 pb-16 md:px-6 scroll-mt-20">
+        <div className="flex flex-col gap-4 border-b border-border pb-4 md:flex-row md:items-end md:justify-between">
           <div>
             <h2 className="text-2xl font-black uppercase tracking-wider">Trending Pre-Loved</h2>
             <p className="text-xs text-muted-foreground">
-              {products.length} verified items · updated live
+              {loading ? "Refreshing..." : `${dbListings.length} verified items listed from actual Myntra purchases`}
             </p>
           </div>
-          <div className="hidden gap-2 text-xs font-semibold uppercase tracking-wide md:flex">
-            {["Recommended", "New in", "Price ↑", "Price ↓", "Discount"].map((f, i) => (
+          
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Search bar */}
+            <div className="relative flex-1 min-w-[200px] md:flex-initial">
+              <input
+                type="text"
+                placeholder="Search brands or titles..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-9 rounded-md border border-border pl-8 pr-8 text-xs focus:border-primary focus:outline-none"
+              />
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-2 h-5 w-5 rounded-full flex items-center justify-center hover:bg-muted"
+                >
+                  <X className="h-3 w-3 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+
+            {/* Sorting buttons */}
+            <div className="flex gap-2 text-xs font-semibold uppercase tracking-wide">
               <button
-                key={f}
-                className={`rounded-full border px-3 py-1.5 ${i === 0 ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-foreground"}`}
+                onClick={() => setPriceSort(undefined)}
+                className={`rounded-full border px-3 py-1.5 cursor-pointer ${priceSort === undefined ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-foreground bg-background"}`}
               >
-                {f}
+                Recommended
               </button>
-            ))}
+              <button
+                onClick={() => setPriceSort("asc")}
+                className={`rounded-full border px-3 py-1.5 cursor-pointer ${priceSort === "asc" ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-foreground bg-background"}`}
+              >
+                Price: Low to High
+              </button>
+              <button
+                onClick={() => setPriceSort("desc")}
+                className={`rounded-full border px-3 py-1.5 cursor-pointer ${priceSort === "desc" ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-foreground bg-background"}`}
+              >
+                Price: High to Low
+              </button>
+            </div>
           </div>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-6 md:grid-cols-4">
-          {products.map((p) => (
-            <ProductCard key={p.id} p={p} />
-          ))}
-        </div>
+
+        {/* Selected category alert */}
+        {selectedCategory && (
+          <div className="mt-3 flex items-center gap-2 text-xs">
+            <span className="bg-primary/10 text-primary px-2.5 py-1 rounded-full font-bold uppercase flex items-center gap-1.5">
+              Category: {selectedCategory}
+              <button onClick={() => setSelectedCategory(undefined)} className="hover:text-primary-foreground hover:bg-primary rounded-full p-0.5">
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="py-20 text-center text-sm text-muted-foreground animate-pulse">
+            Fetching verified pre-loved fashion...
+          </div>
+        ) : dbListings.length === 0 ? (
+          <div className="py-20 text-center border border-dashed border-border rounded-md mt-6 bg-card">
+            <div className="text-lg font-bold">No active listings found</div>
+            <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+              {searchQuery || selectedCategory
+                ? "Try adjusting your filters or search terms."
+                : "Be the first to list! Go to 'Resell your Myntra order' to create a listing."}
+            </p>
+            {(searchQuery || selectedCategory) && (
+              <button
+                onClick={() => {
+                  setSearchQuery("");
+                  setSelectedCategory(undefined);
+                }}
+                className="mt-4 px-4 py-2 bg-primary text-white text-xs font-bold uppercase tracking-wider rounded-md"
+              >
+                Clear all filters
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="mt-6 grid grid-cols-2 gap-x-3 gap-y-6 md:grid-cols-4">
+            {dbListings.map((p) => (
+              <ProductCard key={p.id} p={p} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Sell CTA */}

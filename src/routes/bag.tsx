@@ -1,18 +1,24 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+// src/routes/bag.tsx
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { supabase } from "@/integrations/supabase/client";
 import { useRequireAuth } from "@/lib/require-auth";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ShoppingBag, Trash2, ShieldCheck, Truck } from "lucide-react";
-import { computePrice, inr, type Product } from "@/lib/mock-data";
+import { ShoppingBag, Trash2, ShieldCheck, Truck, AlertTriangle } from "lucide-react";
+import { inr } from "@/lib/mock-data";
 
-type Row = {
+type BagRow = {
   id: string;
-  product_id: string;
-  product_data: Product;
-  size: string | null;
+  listing_id: string;
+  brand: string;
+  title: string;
+  size: string;
   quantity: number;
+  price: number;
+  image: string;
+  status: string;
+  isAvailable: boolean;
 };
 
 export const Route = createFileRoute("/bag")({
@@ -22,39 +28,96 @@ export const Route = createFileRoute("/bag")({
 
 function BagPage() {
   const { user, loading } = useRequireAuth();
-  const [items, setItems] = useState<Row[]>([]);
+  const navigate = useNavigate();
+  const [items, setItems] = useState<BagRow[]>([]);
   const [busy, setBusy] = useState(true);
 
-  useEffect(() => {
+  const fetchBag = async () => {
     if (!user) return;
-    supabase
-      .from("bag_items")
-      .select("id,product_id,product_data,size,quantity")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (error) toast.error(error.message);
-        else setItems((data ?? []) as Row[]);
-        setBusy(false);
+    setBusy(true);
+    try {
+      const { data, error } = await supabase
+        .from("bag_items")
+        .select(`
+          id,
+          size,
+          quantity,
+          listings (
+            id,
+            title,
+            brand,
+            category,
+            size,
+            current_price_paise,
+            declared_grade,
+            confirmed_grade,
+            status,
+            listing_media (
+              storage_key,
+              angle
+            )
+          )
+        `)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      const formatted: BagRow[] = (data ?? []).map((row: any) => {
+        const l = row.listings || {};
+        const media = l.listing_media || [];
+        const imagePath = media.find((m: any) => m.angle === "top")?.storage_key || media[0]?.storage_key || "";
+        const publicUrl = imagePath
+          ? `${process.env.SUPABASE_URL}/storage/v1/object/public/resell-photos/${imagePath}`
+          : "https://picsum.photos/seed/resell-default/600/750";
+
+        const price = l.current_price_paise ? Number(l.current_price_paise) / 100 : 0;
+
+        return {
+          id: row.id,
+          listing_id: l.id,
+          brand: l.brand || "Brand",
+          title: l.title || "Pre-loved Fashion",
+          size: row.size || l.size || "M",
+          quantity: row.quantity,
+          price: price,
+          image: publicUrl,
+          status: l.status,
+          isAvailable: l.status === "live",
+        };
       });
+
+      setItems(formatted);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to load bag items");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) fetchBag();
   }, [user]);
 
   const remove = async (id: string) => {
     const { error } = await supabase.from("bag_items").delete().eq("id", id);
     if (error) return toast.error(error.message);
     setItems((prev) => prev.filter((i) => i.id !== id));
+    toast.success("Item removed from bag");
   };
 
-  const priceOf = (p: Product) =>
-    computePrice(p.originalPrice, p.ageYears, p.confirmedGrade ?? p.declaredGrade).listPrice;
-  const subtotal = items.reduce((sum, r) => sum + priceOf(r.product_data) * r.quantity, 0);
+  // Only sum available items
+  const availableItems = items.filter((i) => i.isAvailable);
+  const subtotal = availableItems.reduce((sum, r) => sum + r.price * r.quantity, 0);
+  const hasUnavailable = items.some((i) => !i.isAvailable);
 
-  if (loading || !user)
+  if (loading || !user) {
     return (
       <Frame>
-        <div className="p-20 text-center text-sm text-muted-foreground">Loading…</div>
+        <div className="p-20 text-center text-sm text-muted-foreground font-semibold">Validating session security...</div>
       </Frame>
     );
+  }
 
   return (
     <Frame>
@@ -62,66 +125,75 @@ function BagPage() {
         <div>
           <h1 className="text-2xl font-black">My Bag</h1>
           <p className="text-sm text-muted-foreground">
-            {items.length} item{items.length === 1 ? "" : "s"} · escrow-protected checkout
+            {items.length} item{items.length === 1 ? "" : "s"} · escrow-protected circular check
           </p>
 
           {busy ? (
-            <div className="mt-16 text-center text-sm text-muted-foreground">Loading…</div>
+            <div className="mt-16 text-center text-sm text-muted-foreground animate-pulse">Checking item ledger status...</div>
           ) : items.length === 0 ? (
-            <div className="mt-8 rounded-md border border-dashed border-border p-16 text-center">
+            <div className="mt-8 rounded-md border border-dashed border-border p-16 text-center bg-card shadow-sm">
               <ShoppingBag className="mx-auto h-10 w-10 text-muted-foreground" />
               <div className="mt-3 text-lg font-bold">Your bag is empty</div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Add pre-loved pieces you love. Every item is AI Verified and inspected before
-                delivery.
+              <p className="mt-1 text-sm text-muted-foreground text-pretty max-w-sm mx-auto">
+                Browse the marketplace for authenticated pre-loved Myntra products. Zero risk doorstep protection active.
               </p>
               <Link
                 to="/"
-                className="mt-4 inline-block rounded-md bg-primary px-6 py-3 text-sm font-bold uppercase tracking-wide text-primary-foreground"
+                className="mt-6 inline-block rounded-md bg-primary px-6 py-3 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/95 transition shadow-sm"
               >
                 Browse marketplace
               </Link>
             </div>
           ) : (
-            <div className="mt-6 space-y-3">
-              {items.map((row) => {
-                const p = row.product_data;
-                const list = priceOf(p);
-                return (
-                  <div
-                    key={row.id}
-                    className="flex gap-4 rounded-md border border-border bg-card p-4 shadow-card"
-                  >
-                    <Link to="/product/$id" params={{ id: p.id }} className="flex-shrink-0">
-                      <img
-                        src={p.image}
-                        alt={p.title}
-                        className="h-28 w-24 rounded-sm object-cover"
-                      />
-                    </Link>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold">{p.brand}</div>
-                      <div className="truncate text-sm text-muted-foreground">{p.title}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        Size {row.size ?? p.size} · Qty {row.quantity}
-                      </div>
-                      <div className="mt-2 text-base font-black">
-                        {inr(list)}{" "}
-                        <span className="text-xs font-normal text-muted-foreground line-through">
-                          {inr(p.originalPrice)}
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => remove(row.id)}
-                      aria-label="Remove"
-                      className="self-start rounded-md border border-border p-2 text-muted-foreground hover:border-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+            <div className="mt-6 space-y-4">
+              {hasUnavailable && (
+                <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3.5 text-xs text-destructive leading-relaxed flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <div>
+                    Some items in your bag are no longer available (sold or withdrawn). Please remove them to proceed to checkout.
                   </div>
-                );
-              })}
+                </div>
+              )}
+              {items.map((row) => (
+                <div
+                  key={row.id}
+                  className={`flex gap-4 rounded-md border p-4 shadow-card transition bg-card ${
+                    row.isAvailable ? "border-border" : "border-destructive/20 bg-destructive/5 opacity-80"
+                  }`}
+                >
+                  <Link to="/product/$id" params={{ id: row.listing_id }} className="flex-shrink-0">
+                    <img
+                      src={row.image}
+                      alt={row.title}
+                      className="h-28 w-24 rounded-sm object-cover bg-muted"
+                    />
+                  </Link>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold text-foreground">{row.brand}</div>
+                    <div className="truncate text-sm text-muted-foreground">{row.title}</div>
+                    <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
+                      <span>Size: <b>{row.size}</b></span>
+                      <span>Qty: <b>{row.quantity}</b></span>
+                    </div>
+                    
+                    <div className="mt-2 flex items-baseline gap-2">
+                      <span className="text-base font-black">{inr(row.price)}</span>
+                      {!row.isAvailable && (
+                        <span className="inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-destructive">
+                          Unavailable
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => remove(row.id)}
+                    aria-label="Remove"
+                    className="self-start rounded-md border border-border p-2 text-muted-foreground hover:border-destructive hover:text-destructive cursor-pointer"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -132,21 +204,23 @@ function BagPage() {
           </div>
           <div className="mt-3 space-y-2 text-sm">
             <Row
-              label={`Subtotal (${items.length} item${items.length === 1 ? "" : "s"})`}
+              label={`Subtotal (${availableItems.length} available)`}
               value={inr(subtotal)}
             />
-            <Row label="Buyer protection" value="FREE" accent />
-            <Row label="Delivery" value="FREE" accent />
+            <Row label="Buyer protection fee" value="FREE" accent />
+            <Row label="Delivery promise" value="FREE" accent />
             <div className="my-2 h-px bg-border" />
             <Row label="Total payable" value={inr(subtotal)} bold />
           </div>
+          
           <button
-            disabled={items.length === 0}
-            onClick={() => toast.info("Checkout is a hackathon prototype — payments coming soon.")}
-            className="mt-5 h-12 w-full rounded-md bg-primary text-sm font-bold uppercase tracking-wide text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
+            disabled={availableItems.length === 0 || hasUnavailable}
+            onClick={() => navigate({ to: "/checkout" })}
+            className="mt-5 h-12 w-full rounded-md bg-primary text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 disabled:opacity-40 cursor-pointer shadow transition"
           >
-            Place order
+            Proceed to Checkout
           </button>
+          
           <div className="mt-4 space-y-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-verified" /> Escrow-protected · pay after
@@ -174,9 +248,9 @@ function Frame({ children }: { children: React.ReactNode }) {
 
 function Row({ label, value, bold, accent }: any) {
   return (
-    <div className={`flex justify-between ${bold ? "font-bold" : ""}`}>
+    <div className={`flex justify-between ${bold ? "font-bold border-t border-border pt-2 text-foreground" : ""}`}>
       <span className="text-muted-foreground">{label}</span>
-      <span className={accent ? "text-success font-semibold" : ""}>{value}</span>
+      <span className={accent ? "text-success font-semibold" : "text-foreground"}>{value}</span>
     </div>
   );
 }

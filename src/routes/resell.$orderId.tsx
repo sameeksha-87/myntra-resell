@@ -1,6 +1,7 @@
-import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+// src/routes/resell.$orderId.tsx
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
-import { computePrice, eligibleOrders, inr, type Grade, type EligibleOrder } from "@/lib/mock-data";
+import { inr, type Grade } from "@/lib/mock-data";
 import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Camera,
@@ -12,20 +13,25 @@ import {
   AlertTriangle,
   RefreshCw,
   Sliders,
+  ChevronLeft,
+  XCircle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 import { measureBlur } from "@/lib/image-processing";
+import {
+  createListingDraft,
+  uploadListingMedia,
+  submitForVerification,
+} from "@/integrations/supabase/actions.server";
 
 export const Route = createFileRoute("/resell/$orderId")({
   loader: ({ params }) => {
-    const order = eligibleOrders.find((o) => o.orderId === params.orderId);
-    if (!order) throw notFound();
-    return { order };
+    return { orderItemId: params.orderId };
   },
   head: ({ params }) => ({
-    meta: [{ title: `Resell order ${params.orderId} — ReSell by Myntra` }],
+    meta: [{ title: `Resell closet item — ReSell by Myntra` }],
   }),
   component: ResellFlow,
 });
@@ -57,7 +63,7 @@ const grades: { grade: Grade; blurb: string; example: string }[] = [
 ];
 
 function ResellFlow() {
-  const { order } = Route.useLoaderData();
+  const { orderItemId } = Route.useLoaderData();
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const [step, setStep] = useState<Step>(0);
@@ -65,7 +71,13 @@ function ResellFlow() {
   const [grade, setGrade] = useState<Grade>("Excellent");
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState(false);
+  const [verifFailed, setVerifFailed] = useState(false);
+  const [verifReason, setVerifReason] = useState("");
   const [listingId, setListingId] = useState<string | null>(null);
+
+  // Loaded DB Order Item details
+  const [order, setOrder] = useState<any>(null);
+  const [orderLoading, setOrderLoading] = useState(true);
 
   const [activeAngle, setActiveAngle] = useState<string | null>(null);
   const [scanningAngle, setScanningAngle] = useState<string | null>(null);
@@ -81,49 +93,131 @@ function ResellFlow() {
     }
   }, [user, loading, navigate]);
 
+  useEffect(() => {
+    if (!user) return;
+    setOrderLoading(true);
+    supabase
+      .from("myntra_order_items")
+      .select(`
+        id,
+        title,
+        size,
+        original_price_paise,
+        image,
+        myntra_orders (
+          id,
+          delivered_at
+        )
+      `)
+      .eq("id", orderItemId)
+      .single()
+      .then(({ data, error }) => {
+        if (error || !data) {
+          toast.error("Order item not found");
+          navigate({ to: "/orders" });
+          return;
+        }
+
+        const o = data.myntra_orders as any;
+        const purchaseDate = new Date(o.delivered_at);
+        const ageYears = Math.max(0.1, (new Date().getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+
+        setOrder({
+          id: data.id,
+          orderId: o.id,
+          brand: "Zara", // Fallback brand name
+          title: data.title,
+          category: "Outerwear",
+          size: data.size,
+          originalPrice: Number(data.original_price_paise) / 100,
+          purchaseDate: purchaseDate.toLocaleDateString("en-IN", { month: "short", year: "numeric" }),
+          ageYears: ageYears,
+          image: data.image,
+        });
+        setOrderLoading(false);
+      });
+  }, [orderItemId, user]);
+
   const photosDone = Object.keys(photos).length;
-  const price = useMemo(
-    () => computePrice(order.originalPrice, order.ageYears, grade),
-    [order, grade],
-  );
+
+  const price = useMemo(() => {
+    if (!order) return { listPrice: 0, sellerPayout: 0, commission: 0, depreciation: 1, factor: 1 };
+    
+    // Staging / preview formula: matches server algorithm
+    const gradeFactors = { Pristine: 1.0, Excellent: 0.85, Good: 0.70 };
+    const factor = gradeFactors[grade] || 0.85;
+    const depreciation = Math.max(0.2, 1.0 - 0.20 * order.ageYears);
+    const listPrice = Math.max(0, Math.round(order.originalPrice * depreciation * factor));
+    const sellerPayout = Math.round(listPrice * 0.60);
+    const commission = listPrice - sellerPayout;
+    
+    return {
+      listPrice,
+      sellerPayout,
+      commission,
+      depreciation,
+      factor,
+    };
+  }, [order, grade]);
 
   const startVerify = async () => {
-    if (!user) return;
+    if (!user || !order) return;
     setStep(3);
     setVerifying(true);
-    const { data, error } = await supabase
-      .from("listings")
-      .insert({
-        user_id: user.id,
-        order_id: order.orderId,
-        brand: order.brand,
-        title: order.title,
-        image: order.image,
-        size: order.size,
-        category: order.category,
-        original_price: order.originalPrice,
-        ask_price: price.listPrice,
-        seller_payout: price.sellerPayout,
-        declared_grade: grade,
-        status: "verifying",
-      })
-      .select("id")
-      .single();
-    if (error) {
-      toast.error(error.message);
+    setVerifFailed(false);
+    setScanStatus("Creating listing draft on server...");
+
+    try {
+      // 1. Create draft on server
+      const draftResult = await createListingDraft({
+        data: {
+          orderItemId: order.id,
+          declaredGrade: grade,
+        }
+      });
+      const currentListingId = draftResult.listingId;
+      setListingId(currentListingId);
+
+      // 2. Upload photo attachments
+      const photoKeys = Object.keys(photos);
+      for (let i = 0; i < photoKeys.length; i++) {
+        const angle = photoKeys[i];
+        setScanStatus(`Uploading original ${angle} view to secure private storage...`);
+        await uploadListingMedia({
+          data: {
+            listingId: currentListingId,
+            angle: angle,
+            imageBase64: photos[angle],
+          }
+        });
+      }
+
+      // 3. Submit for AI verification
+      setScanStatus("Running server checks for lighting, perspective and duplicate risk...");
+      const verifResult = await submitForVerification({
+        data: {
+          listingId: currentListingId,
+          simBlur,
+          simWrongAngle,
+        }
+      });
+
+      setVerifying(false);
+      if (verifResult.success) {
+        setVerified(true);
+        toast.success("AI Verification passed! Listing is now live.");
+      } else {
+        setVerified(false);
+        setVerifFailed(true);
+        setVerifReason(verifResult.reason || "Verification check failed");
+        toast.error(`Verification rejected: ${verifResult.reason}`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to submit listing");
       setVerifying(false);
       setStep(2);
-      return;
     }
-    setListingId(data.id);
-    setTimeout(async () => {
-      await supabase
-        .from("listings")
-        .update({ status: "live", updated_at: new Date().toISOString() })
-        .eq("id", data.id);
-      setVerifying(false);
-      setVerified(true);
-    }, 2200);
   };
 
   const handleMobileCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -197,6 +291,19 @@ function ResellFlow() {
       setActiveAngle(null);
     }
   };
+
+  if (orderLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <SiteHeader />
+        <div className="flex flex-col items-center justify-center py-32 gap-3">
+          <Loader2 className="h-8 w-8 text-primary animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading order details...</p>
+        </div>
+        <SiteFooter />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -277,8 +384,14 @@ function ResellFlow() {
             <VerifyStep
               verifying={verifying}
               verified={verified}
+              failed={verifFailed}
+              reason={verifReason}
               onContinue={() => setStep(4)}
-              onBack={() => setStep(2)}
+              onBack={() => {
+                setStep(0); // Let them retake photos if verification failed
+                setVerified(false);
+                setVerifFailed(false);
+              }}
             />
           )}
           {step === 4 && (
@@ -292,22 +405,21 @@ function ResellFlow() {
 
         <aside className="rounded-md border border-border bg-card p-4 shadow-card h-fit sticky top-20">
           <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            Item
+            Item Spec
           </div>
           <div className="mt-2 flex gap-3">
             <img
               src={order.image}
               alt={order.title}
-              className="h-28 w-20 rounded-sm object-cover"
+              className="h-28 w-20 rounded-sm object-cover bg-muted"
             />
             <div>
               <div className="text-sm font-bold">{order.brand}</div>
-              <div className="text-xs text-muted-foreground">{order.title}</div>
-              <div className="mt-1 text-[11px]">
-                Size {order.size} · {order.category}
-              </div>
-              <div className="mt-1 text-[11px] text-muted-foreground">
-                Bought {order.purchaseDate} · {inr(order.originalPrice)}
+              <div className="text-xs text-muted-foreground leading-snug">{order.title}</div>
+              <div className="mt-2 text-[11px] text-muted-foreground space-y-0.5">
+                <div><b>Size:</b> {order.size}</div>
+                <div><b>Bought:</b> {order.purchaseDate}</div>
+                <div><b>Original Price:</b> {inr(order.originalPrice)}</div>
               </div>
             </div>
           </div>
@@ -320,8 +432,8 @@ function ResellFlow() {
           <SummaryRow label="Your payout (60%)" value={inr(price.sellerPayout)} accent />
           <SummaryRow label="Myntra fee (40%)" value={inr(price.commission)} />
 
-          <div className="mt-3 rounded-sm bg-accent/50 p-2 text-[11px] text-accent-foreground">
-            <ShieldCheck className="mr-1 inline h-3 w-3" />
+          <div className="mt-3 rounded-sm bg-accent/50 p-2.5 text-[11px] text-accent-foreground leading-relaxed">
+            <ShieldCheck className="mr-1 inline h-3.5 w-3.5 text-success" />
             Price locks after doorstep inspection confirms grade.
           </div>
         </aside>
@@ -329,6 +441,29 @@ function ResellFlow() {
 
       <SiteFooter />
     </div>
+  );
+}
+
+function Loader2(props: any) {
+  return <Loader2Icon {...props} />;
+}
+
+function Loader2Icon(props: any) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
   );
 }
 
@@ -360,36 +495,35 @@ function PhotoStep({
   return (
     <section>
       <h2 className="text-2xl font-black">Add photos of your item</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Use the in-app camera to capture each perspective. Pre-existing file uploads are disabled to
-        prevent fraud.
+      <p className="mt-1 text-sm text-muted-foreground text-pretty">
+        Use the in-app camera viewfinder to capture each perspective angle. Local file system selection is disabled as an anti-fraud measure.
       </p>
 
       <div className="mt-4 rounded-md border border-dashed border-primary bg-primary/5 p-4 text-sm">
         <div className="flex items-center gap-2 font-bold text-primary mb-2">
-          <Sliders className="h-4 w-4" /> AI Guardrails Tester Settings
+          <Sliders className="h-4 w-4" /> AI Guardrails Simulation Controls
         </div>
-        <p className="text-xs text-muted-foreground mb-3">
-          Configure these switches to test the rejected camera capture workflows locally.
+        <p className="text-xs text-muted-foreground mb-3 text-pretty">
+          Simulate verification errors to inspect the validation and failure retaking states.
         </p>
         <div className="flex flex-col sm:flex-row gap-4">
-          <label className="flex items-center gap-2 cursor-pointer font-semibold text-xs">
+          <label className="flex items-center gap-2 cursor-pointer font-semibold text-xs select-none">
             <input
               type="checkbox"
               checked={simBlur}
               onChange={(e) => setSimBlur(e.target.checked)}
               className="rounded border-border focus:ring-primary h-4 w-4"
             />
-            Simulate Blurry Photo Reject
+            Simulate Blurry Photo (Sharpness &lt; 100)
           </label>
-          <label className="flex items-center gap-2 cursor-pointer font-semibold text-xs">
+          <label className="flex items-center gap-2 cursor-pointer font-semibold text-xs select-none">
             <input
               type="checkbox"
               checked={simWrongAngle}
               onChange={(e) => setSimWrongAngle(e.target.checked)}
               className="rounded border-border focus:ring-primary h-4 w-4"
             />
-            Simulate Incorrect Angle Reject
+            Simulate Perspective/Angle Mismatch
           </label>
         </div>
       </div>
@@ -405,10 +539,10 @@ function PhotoStep({
               onClick={() => !isScanning && onTrigger(a.key)}
               className={`group relative aspect-[3/4] rounded-md border-2 border-dashed p-3 text-left transition ${
                 photoUrl
-                  ? "border-success bg-success/5"
+                  ? "border-success bg-success/5 cursor-pointer"
                   : isScanning
                     ? "border-primary bg-primary/5 cursor-wait"
-                    : "border-border hover:border-primary"
+                    : "border-border hover:border-primary cursor-pointer"
               }`}
             >
               {photoUrl ? (
@@ -450,7 +584,7 @@ function PhotoStep({
         })}
       </div>
 
-      <div className="mt-6 rounded-md border border-border bg-accent/40 p-3.5 text-xs">
+      <div className="mt-6 rounded-md border border-border bg-accent/40 p-3.5 text-xs leading-relaxed">
         <div className="mb-1 font-bold uppercase tracking-wide flex items-center gap-1.5">
           <ShieldCheck className="h-4 w-4 text-success" /> Live capture guardrails active
         </div>
@@ -465,9 +599,9 @@ function PhotoStep({
         <button
           onClick={onContinue}
           disabled={done < angles.length}
-          className="rounded-md bg-primary px-6 py-3 text-sm font-bold uppercase tracking-wide text-primary-foreground disabled:opacity-40"
+          className="rounded-md bg-primary px-6 py-3 text-sm font-bold uppercase tracking-wide text-primary-foreground disabled:opacity-40 cursor-pointer"
         >
-          Continue Condition Verification ({done}/{angles.length})
+          Continue Condition Declaration ({done}/{angles.length})
         </button>
       </div>
     </section>
@@ -579,7 +713,7 @@ function CameraModal({
       <div className="relative w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-950 p-5 text-white shadow-2xl">
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 text-zinc-400 hover:text-white transition"
+          className="absolute right-4 top-4 text-zinc-400 hover:text-white transition cursor-pointer"
         >
           <X className="h-5 w-5" />
         </button>
@@ -646,14 +780,14 @@ function CameraModal({
         <div className="mt-5 flex justify-end gap-2.5">
           <button
             onClick={onClose}
-            className="rounded-md border border-zinc-800 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:bg-zinc-900 transition"
+            className="rounded-md border border-zinc-800 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-zinc-300 hover:bg-zinc-900 transition cursor-pointer"
           >
             Cancel
           </button>
           <button
             onClick={handleCapture}
             disabled={loading || !!error || scanning}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/95 disabled:opacity-40 transition"
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/95 disabled:opacity-40 transition cursor-pointer"
           >
             <Camera className="h-4 w-4" /> Capture Photo
           </button>
@@ -686,7 +820,7 @@ function GradeStep({
           <button
             key={g.grade}
             onClick={() => setGrade(g.grade)}
-            className={`rounded-md border-2 p-4 text-left transition ${grade === g.grade ? "border-primary bg-primary/5" : "border-border hover:border-foreground"}`}
+            className={`rounded-md border-2 p-4 text-left transition cursor-pointer ${grade === g.grade ? "border-primary bg-primary/5" : "border-border hover:border-foreground"}`}
           >
             <div className="flex items-center justify-between">
               <div className="text-lg font-black">{g.grade}</div>
@@ -700,7 +834,7 @@ function GradeStep({
           </button>
         ))}
       </div>
-      <div className="mt-4 flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs">
+      <div className="mt-4 flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs leading-relaxed">
         <AlertTriangle className="mt-0.5 h-4 w-4 text-warning-foreground" />
         <div>
           Overstating grade twice forfeits your ₹79 seller deposit and can restrict future listings.
@@ -709,13 +843,13 @@ function GradeStep({
       <div className="mt-6 flex justify-between">
         <button
           onClick={onBack}
-          className="rounded-md border border-border px-6 py-3 text-sm font-bold uppercase"
+          className="rounded-md border border-border px-6 py-3 text-sm font-bold uppercase cursor-pointer"
         >
           Back
         </button>
         <button
           onClick={onContinue}
-          className="rounded-md bg-primary px-6 py-3 text-sm font-bold uppercase text-primary-foreground"
+          className="rounded-md bg-primary px-6 py-3 text-sm font-bold uppercase text-primary-foreground cursor-pointer"
         >
           Continue
         </button>
@@ -725,8 +859,8 @@ function GradeStep({
 }
 
 interface PriceStepProps {
-  price: ReturnType<typeof computePrice>;
-  order: EligibleOrder;
+  price: any;
+  order: any;
   grade: Grade;
   onBack: () => void;
   onContinue: () => void;
@@ -753,7 +887,7 @@ function PriceStep({ price, order, grade, onBack, onContinue }: PriceStepProps) 
         <div className="divide-y divide-border text-sm">
           <BreakRow label="Original Myntra price" value={inr(order.originalPrice)} />
           <BreakRow
-            label={`Depreciation · ${order.ageYears} yr × 20%`}
+            label={`Depreciation · ${order.ageYears.toFixed(1)} yr × 20%`}
             value={`× ${price.depreciation.toFixed(2)}`}
           />
           <BreakRow label={`Grade factor · ${grade}`} value={`× ${price.factor.toFixed(2)}`} />
@@ -763,8 +897,8 @@ function PriceStep({ price, order, grade, onBack, onContinue }: PriceStepProps) 
         </div>
       </div>
 
-      <div className="mt-4 flex items-start gap-2 rounded-md bg-accent/40 p-3 text-xs">
-        <Sparkles className="mt-0.5 h-4 w-4 text-primary" />
+      <div className="mt-4 flex items-start gap-2 rounded-md bg-accent/40 p-3 text-xs leading-relaxed">
+        <Sparkles className="mt-0.5 h-4 w-4 text-primary animate-pulse" />
         <div>
           Price is provisional. If our inspector revises the grade, we recompute and notify the
           buyer before charging.
@@ -774,13 +908,13 @@ function PriceStep({ price, order, grade, onBack, onContinue }: PriceStepProps) 
       <div className="mt-6 flex justify-between">
         <button
           onClick={onBack}
-          className="rounded-md border border-border px-6 py-3 text-sm font-bold uppercase"
+          className="rounded-md border border-border px-6 py-3 text-sm font-bold uppercase cursor-pointer"
         >
           Back
         </button>
         <button
           onClick={onContinue}
-          className="rounded-md bg-primary px-6 py-3 text-sm font-bold uppercase text-primary-foreground"
+          className="rounded-md bg-primary px-6 py-3 text-sm font-bold uppercase text-primary-foreground cursor-pointer"
         >
           Publish listing
         </button>
@@ -792,23 +926,34 @@ function PriceStep({ price, order, grade, onBack, onContinue }: PriceStepProps) 
 interface VerifyStepProps {
   verifying: boolean;
   verified: boolean;
+  failed: boolean;
+  reason: string;
   onContinue: () => void;
   onBack: () => void;
 }
 
-function VerifyStep({ verifying, verified, onContinue, onBack }: VerifyStepProps) {
+function VerifyStep({ verifying, verified, failed, reason, onContinue, onBack }: VerifyStepProps) {
   const checks = [
-    { label: "Image quality gate", note: "Blur / lighting / resolution / background" },
+    { label: "Image quality gate", note: "Blur / lighting / resolution check" },
     { label: "Category & brand match", note: "Against original Myntra purchase record" },
-    { label: "Reverse-image duplicate check", note: "Reject scraped or stock photos" },
-    { label: "Confidence score", note: "Verified · Needs Review · Rejected" },
+    { label: "Duplicate image detection", note: "Prevent stock photo or scraped list" },
+    { label: "Confidence scoring", note: "Durable validation audit complete" },
   ];
+  
   return (
     <section>
       <h2 className="text-2xl font-black">Auto Product Verification</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Runs in the background — no waiting on a rendering pipeline.
+      <p className="mt-1 text-sm text-muted-foreground text-pretty">
+        Server runs validation algorithms asynchronously on the uploaded original media keys.
       </p>
+      
+      {verifying && (
+        <div className="mt-3 text-xs text-primary font-bold flex items-center gap-1.5 animate-pulse">
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+          Running: {verifying}
+        </div>
+      )}
+
       <div className="mt-4 grid gap-3">
         {checks.map((c, i) => (
           <div
@@ -825,6 +970,10 @@ function VerifyStep({ verifying, verified, onContinue, onBack }: VerifyStepProps
                   className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"
                   style={{ animationDelay: `${i * 120}ms` }}
                 />
+              ) : failed ? (
+                <div className="rounded-full bg-destructive p-1 text-white">
+                  <XCircle className="h-4 w-4" />
+                </div>
               ) : (
                 <div className="rounded-full bg-success p-1 text-white">
                   <Check className="h-4 w-4" />
@@ -845,17 +994,32 @@ function VerifyStep({ verifying, verified, onContinue, onBack }: VerifyStepProps
         </div>
       )}
 
+      {failed && (
+        <div className="mt-4 flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive leading-relaxed">
+          <AlertTriangle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+          <div>
+            <div className="font-bold">Verification rejected by AI guardrails</div>
+            <div className="text-xs">
+              Reason code: <span className="font-bold underline">{reason}</span>. 
+              {!reason.includes("perspective") 
+                ? " The photos uploaded were too blurry or low resolution. Hold camera steady and capture in bright lighting." 
+                : " The capture perspective did not match the grid overlay layout guidelines."}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mt-6 flex justify-between">
         <button
           onClick={onBack}
-          className="rounded-md border border-border px-6 py-3 text-sm font-bold uppercase"
+          className="rounded-md border border-border px-6 py-3 text-sm font-bold uppercase cursor-pointer flex items-center gap-1.5"
         >
-          Back
+          <ChevronLeft className="h-4 w-4" /> {failed ? "Retake Photos" : "Back"}
         </button>
         <button
           onClick={onContinue}
           disabled={!verified}
-          className="rounded-md bg-primary px-6 py-3 text-sm font-bold uppercase text-primary-foreground disabled:opacity-40"
+          className="rounded-md bg-primary px-6 py-3 text-sm font-bold uppercase text-primary-foreground disabled:opacity-40 cursor-pointer"
         >
           Go live
         </button>
@@ -871,20 +1035,20 @@ function LiveStep({ onView }: { onView: () => void }) {
         <Check className="h-8 w-8" />
       </div>
       <h2 className="mt-4 text-2xl font-black">Your listing is live!</h2>
-      <p className="mt-2 text-sm text-muted-foreground">
+      <p className="mt-2 text-sm text-muted-foreground text-pretty">
         Buyers can now see it in ReSell search & discovery, labelled AI Verified. You'll get a push
         notification the moment it sells.
       </p>
       <div className="mt-6 flex justify-center gap-3">
         <button
           onClick={onView}
-          className="rounded-md bg-primary px-6 py-3 text-sm font-bold uppercase text-primary-foreground"
+          className="rounded-md bg-primary px-6 py-3 text-sm font-bold uppercase text-primary-foreground cursor-pointer"
         >
           Track listing
         </button>
         <Link
           to="/"
-          className="rounded-md border border-border px-6 py-3 text-sm font-bold uppercase"
+          className="rounded-md border border-border px-6 py-3 text-sm font-bold uppercase cursor-pointer"
         >
           Back to marketplace
         </Link>
