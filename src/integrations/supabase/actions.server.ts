@@ -18,13 +18,13 @@ async function checkUserRole(userId: string, role: "admin" | "inspector"): Promi
 }
 
 // 1. Seed user mock orders
-export const seedUserOrders = createServerFn({ type: "mutation" })
+export const seedUserOrders = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { userId } = context;
-    
+
     // Call the PostgreSQL stored procedure to seed mock orders
-    const { error } = await supabaseAdmin.rpc("seed_user_mock_orders", {
+    const { error } = await (supabaseAdmin as any).rpc("seed_user_mock_orders", {
       target_user_id: userId,
     });
 
@@ -37,13 +37,13 @@ export const seedUserOrders = createServerFn({ type: "mutation" })
   });
 
 // 2. Create listing draft
-export const createListingDraft = createServerFn({ type: "mutation" })
+export const createListingDraft = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(
     z.object({
       orderItemId: z.string().uuid(),
       declaredGrade: z.enum(["Pristine", "Excellent", "Good"]),
-    })
+    }),
   )
   .handler(async ({ context, data }) => {
     const { userId } = context;
@@ -52,7 +52,8 @@ export const createListingDraft = createServerFn({ type: "mutation" })
     // Check if the order item belongs to this user and is eligible
     const { data: item, error: itemError } = await supabaseAdmin
       .from("myntra_order_items")
-      .select(`
+      .select(
+        `
         id,
         original_price_paise,
         title,
@@ -66,7 +67,8 @@ export const createListingDraft = createServerFn({ type: "mutation" })
         eligibility_decisions (
           eligible
         )
-      `)
+      `,
+      )
       .eq("id", orderItemId)
       .single();
 
@@ -91,13 +93,24 @@ export const createListingDraft = createServerFn({ type: "mutation" })
       .eq("source_order_item_id", orderItemId)
       .maybeSingle();
 
-    if (existingListing && !["verification_failed", "cancelled", "withdrawn"].includes(existingListing.status)) {
+    const RESUMABLE_STATUSES = [
+      "draft",
+      "verification_pending",
+      "verification_failed",
+      "cancelled",
+      "withdrawn",
+    ];
+
+    if (existingListing && !RESUMABLE_STATUSES.includes(existingListing.status)) {
       throw new Error("An active listing already exists for this order item");
     }
 
     // Calculate listing price based on original price, age, and grade
     const purchaseDate = new Date(order.delivered_at);
-    const ageYears = Math.max(0, (new Date().getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+    const ageYears = Math.max(
+      0,
+      (new Date().getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25),
+    );
 
     // Fetch pricing rule factors
     const { data: pricingRules } = await supabaseAdmin
@@ -113,11 +126,14 @@ export const createListingDraft = createServerFn({ type: "mutation" })
 
     const factors = pricingRules.factors as any;
     const gradeFactor = factors[declaredGrade] || 1.0;
-    const depreciationRate = factors.depreciation_per_year || 0.20;
+    const depreciationRate = factors.depreciation_per_year || 0.2;
 
     const originalPricePaise = Number(item.original_price_paise);
     const depreciationFactor = Math.max(0.2, 1.0 - depreciationRate * ageYears);
-    const listingPricePaise = Math.max(0, Math.round(originalPricePaise * depreciationFactor * gradeFactor));
+    const listingPricePaise = Math.max(
+      0,
+      Math.round(originalPricePaise * depreciationFactor * gradeFactor),
+    );
     const sellerPayoutPaise = Math.round(listingPricePaise * (1 - pricingRules.commission_rate));
     const commissionPaise = listingPricePaise - sellerPayoutPaise;
 
@@ -183,14 +199,14 @@ export const createListingDraft = createServerFn({ type: "mutation" })
   });
 
 // 3. Upload Listing Media
-export const uploadListingMedia = createServerFn({ type: "mutation" })
+export const uploadListingMedia = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(
     z.object({
       listingId: z.string().uuid(),
       angle: z.string(),
       imageBase64: z.string(),
-    })
+    }),
   )
   .handler(async ({ context, data }) => {
     const { userId } = context;
@@ -207,12 +223,16 @@ export const uploadListingMedia = createServerFn({ type: "mutation" })
     if (listing.seller_id !== userId) throw new Error("Unauthorized");
 
     // Convert base64 to Buffer
-    const buffer = Buffer.from(imageBase64.replace(/^data:image\/\w+;base64,/, ""), "base64");
+    const base64Payload = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+    const binaryString = atob(base64Payload);
+    const buffer = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      buffer[i] = binaryString.charCodeAt(i);
+    }
     const mimeType = imageBase64.match(/[^:]\w+\/[\w-+\d.]+(?=\;)/)?.[0] || "image/jpeg";
-    
     // Store image in Supabase bucket
     const fileName = `${listingId}/${angle}_${Date.now()}.jpg`;
-    
+
     const { data: uploadData, error: uploadErr } = await supabaseAdmin.storage
       .from("resell-photos")
       .upload(fileName, buffer, {
@@ -251,14 +271,14 @@ export const uploadListingMedia = createServerFn({ type: "mutation" })
   });
 
 // 4. Submit for Verification
-export const submitForVerification = createServerFn({ type: "mutation" })
+export const submitForVerification = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(
     z.object({
       listingId: z.string().uuid(),
       simBlur: z.boolean().default(false),
       simWrongAngle: z.boolean().default(false),
-    })
+    }),
   )
   .handler(async ({ context, data }) => {
     const { userId } = context;
@@ -345,11 +365,14 @@ export const submitForVerification = createServerFn({ type: "mutation" })
         })
         .eq("id", listingId);
 
-      await supabaseAdmin.from("verification_runs").update({
-        status: "completed",
-        confidence: 0.93,
-        completed_at: new Date().toISOString(),
-      }).eq("id", runId);
+      await supabaseAdmin
+        .from("verification_runs")
+        .update({
+          status: "completed",
+          confidence: 0.93,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", runId);
 
       await supabaseAdmin.from("listing_events").insert({
         listing_id: listingId,
@@ -374,12 +397,15 @@ export const submitForVerification = createServerFn({ type: "mutation" })
         })
         .eq("id", listingId);
 
-      await supabaseAdmin.from("verification_runs").update({
-        status: "failed",
-        confidence: 0.45,
-        error_reason: reason,
-        completed_at: new Date().toISOString(),
-      }).eq("id", runId);
+      await supabaseAdmin
+        .from("verification_runs")
+        .update({
+          status: "failed",
+          confidence: 0.45,
+          error_reason: reason,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", runId);
 
       await supabaseAdmin.from("listing_events").insert({
         listing_id: listingId,
@@ -396,7 +422,7 @@ export const submitForVerification = createServerFn({ type: "mutation" })
   });
 
 // 5. Checkout validation & place order
-export const placeCheckoutOrder = createServerFn({ type: "mutation" })
+export const placeCheckoutOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(
     z.object({
@@ -410,7 +436,7 @@ export const placeCheckoutOrder = createServerFn({ type: "mutation" })
         state: z.string(),
         pincode: z.string(),
       }),
-    })
+    }),
   )
   .handler(async ({ context, data }) => {
     const { userId } = context;
@@ -419,7 +445,7 @@ export const placeCheckoutOrder = createServerFn({ type: "mutation" })
     // Use a transactional pipeline
     // In javascript, we perform queries inside a transaction lock context.
     // For a hackathon web app, we can use a PostgreSQL transactional lock: "SELECT ... FOR UPDATE" to prevent double checkouts.
-    
+
     const { data: listing, error: listingErr } = await supabaseAdmin
       .from("listings")
       .select("*")
@@ -471,9 +497,9 @@ export const placeCheckoutOrder = createServerFn({ type: "mutation" })
 
     // Fetch pricing rule version and compute fees
     const price = Number(listing.current_price_paise);
-    
+
     // Configured fees
-    const commissionPaise = Math.round(price * 0.40);
+    const commissionPaise = Math.round(price * 0.4);
     const payoutPaise = price - commissionPaise;
     const buyerFees = 0; // free delivery and buyer protection in prototype
 
@@ -525,7 +551,7 @@ export const placeCheckoutOrder = createServerFn({ type: "mutation" })
         account_from: "buyer",
         account_to: "escrow",
         amount_paise: price,
-      }
+      },
     ]);
 
     // Schedule Pickup Job
@@ -563,7 +589,7 @@ export const placeCheckoutOrder = createServerFn({ type: "mutation" })
   });
 
 // 6. Inspector submit doorstep report
-export const inspectorSubmitReport = createServerFn({ type: "mutation" })
+export const inspectorSubmitReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(
     z.object({
@@ -571,7 +597,7 @@ export const inspectorSubmitReport = createServerFn({ type: "mutation" })
       confirmedGrade: z.enum(["Pristine", "Excellent", "Good"]),
       passed: z.boolean(),
       notes: z.string().optional(),
-    })
+    }),
   )
   .handler(async ({ context, data }) => {
     const { userId } = context;
@@ -619,9 +645,15 @@ export const inspectorSubmitReport = createServerFn({ type: "mutation" })
 
     if (!passed) {
       // Failed inspection entirely!
-      await supabaseAdmin.from("listings").update({ status: "verification_failed" }).eq("id", listingId);
-      await supabaseAdmin.from("resale_orders").update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("id", order.id);
-      
+      await supabaseAdmin
+        .from("listings")
+        .update({ status: "verification_failed" })
+        .eq("id", listingId);
+      await supabaseAdmin
+        .from("resale_orders")
+        .update({ status: "cancelled", updated_at: new Date().toISOString() })
+        .eq("id", order.id);
+
       // Issue Refund
       await supabaseAdmin.from("payment_transactions").insert({
         order_id: order.id,
@@ -637,7 +669,7 @@ export const inspectorSubmitReport = createServerFn({ type: "mutation" })
           account_from: "escrow",
           account_to: "buyer",
           amount_paise: order.final_price_paise,
-        }
+        },
       ]);
 
       await supabaseAdmin.from("listing_events").insert({
@@ -655,19 +687,36 @@ export const inspectorSubmitReport = createServerFn({ type: "mutation" })
 
     if (gradeMatches) {
       // Grade matches, inspection passes directly!
-      await supabaseAdmin.from("listings").update({ confirmed_grade: confirmedGrade, status: "inspection_passed" }).eq("id", listingId);
-      await supabaseAdmin.from("resale_orders").update({ status: "in_transit", updated_at: new Date().toISOString() }).eq("id", order.id);
+      await supabaseAdmin
+        .from("listings")
+        .update({ confirmed_grade: confirmedGrade, status: "inspection_passed" })
+        .eq("id", listingId);
+      await supabaseAdmin
+        .from("resale_orders")
+        .update({ status: "in_transit", updated_at: new Date().toISOString() })
+        .eq("id", order.id);
 
       // Update pickup job and shipment
-      await supabaseAdmin.from("pickup_jobs").update({ status: "picked_up" }).eq("listing_id", listingId);
-      
-      const { data: shipment } = await supabaseAdmin.from("shipments").select("id").eq("order_id", order.id).single();
+      await supabaseAdmin
+        .from("pickup_jobs")
+        .update({ status: "picked_up" })
+        .eq("listing_id", listingId);
+
+      const { data: shipment } = await supabaseAdmin
+        .from("shipments")
+        .select("id")
+        .eq("order_id", order.id)
+        .single();
       if (shipment) {
-        await supabaseAdmin.from("shipments").update({ status: "in_transit", updated_at: new Date().toISOString() }).eq("id", shipment.id);
+        await supabaseAdmin
+          .from("shipments")
+          .update({ status: "in_transit", updated_at: new Date().toISOString() })
+          .eq("id", shipment.id);
         await supabaseAdmin.from("tracking_events").insert({
           shipment_id: shipment.id,
           status: "in_transit",
-          description: "Package picked up and doorstep inspection passed. Shipped via delivery partner.",
+          description:
+            "Package picked up and doorstep inspection passed. Shipped via delivery partner.",
         });
       }
 
@@ -700,41 +749,61 @@ export const inspectorSubmitReport = createServerFn({ type: "mutation" })
       if (!quote) throw new Error("Price quote not found");
 
       const factors = quote.factors as any;
-      const gradeFactors: Record<string, number> = { Pristine: 1.0, Excellent: 0.85, Good: 0.70 };
-      const newFactor = gradeFactors[confirmedGrade] || 0.70;
+      const gradeFactors: Record<string, number> = { Pristine: 1.0, Excellent: 0.85, Good: 0.7 };
+      const newFactor = gradeFactors[confirmedGrade] || 0.7;
       const oldFactor = gradeFactors[listing.declared_grade] || 1.0;
 
-      const revisedPricePaise = Math.round(Number(quote.original_price_paise) * factors.depreciationFactor * newFactor);
-      const revisedPayoutPaise = Math.round(revisedPricePaise * 0.60);
+      const revisedPricePaise = Math.round(
+        Number(quote.original_price_paise) * factors.depreciationFactor * newFactor,
+      );
+      const revisedPayoutPaise = Math.round(revisedPricePaise * 0.6);
       const revisedCommissionPaise = revisedPricePaise - revisedPayoutPaise;
 
       // Update listing to revision status
-      await supabaseAdmin.from("listings").update({
-        confirmed_grade: confirmedGrade,
-        status: "inspection_revised",
-        current_price_paise: revisedPricePaise,
-        updated_at: new Date().toISOString()
-      }).eq("id", listingId);
+      await supabaseAdmin
+        .from("listings")
+        .update({
+          confirmed_grade: confirmedGrade,
+          status: "inspection_revised",
+          current_price_paise: revisedPricePaise,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", listingId);
 
-      await supabaseAdmin.from("resale_orders").update({
-        status: "buyer_approval_pending",
-        updated_at: new Date().toISOString()
-      }).eq("id", order.id);
+      await supabaseAdmin
+        .from("resale_orders")
+        .update({
+          status: "buyer_approval_pending",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", order.id);
 
       // Create buyer approvals record
       await supabaseAdmin.from("buyer_approvals").insert({
         order_id: order.id,
         type: "price_revision",
         old_terms: { price: order.final_price_paise, grade: listing.declared_grade },
-        new_terms: { price: revisedPricePaise, grade: confirmedGrade, payout: revisedPayoutPaise, commission: revisedCommissionPaise },
+        new_terms: {
+          price: revisedPricePaise,
+          grade: confirmedGrade,
+          payout: revisedPayoutPaise,
+          commission: revisedCommissionPaise,
+        },
         status: "pending",
         expiry: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours expiry
       });
 
       // Update pickup job
-      await supabaseAdmin.from("pickup_jobs").update({ status: "picked_up" }).eq("listing_id", listingId);
+      await supabaseAdmin
+        .from("pickup_jobs")
+        .update({ status: "picked_up" })
+        .eq("listing_id", listingId);
 
-      const { data: shipment } = await supabaseAdmin.from("shipments").select("id").eq("order_id", order.id).single();
+      const { data: shipment } = await supabaseAdmin
+        .from("shipments")
+        .select("id")
+        .eq("order_id", order.id)
+        .single();
       if (shipment) {
         await supabaseAdmin.from("tracking_events").insert({
           shipment_id: shipment.id,
@@ -751,7 +820,11 @@ export const inspectorSubmitReport = createServerFn({ type: "mutation" })
         to_state: "inspection_revised",
         actor_type: "inspector",
         actor_id: userId,
-        payload: { oldGrade: listing.declared_grade, revisedGrade: confirmedGrade, revisedPrice: revisedPricePaise },
+        payload: {
+          oldGrade: listing.declared_grade,
+          revisedGrade: confirmedGrade,
+          revisedPrice: revisedPricePaise,
+        },
       });
 
       return { outcome: "revised_approval_pending", revisedPricePaise };
@@ -759,13 +832,13 @@ export const inspectorSubmitReport = createServerFn({ type: "mutation" })
   });
 
 // 7. Buyer approve/reject price revision
-export const decidePriceRevision = createServerFn({ type: "mutation" })
+export const decidePriceRevision = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(
     z.object({
       orderId: z.string().uuid(),
       approved: z.boolean(),
-    })
+    }),
   )
   .handler(async ({ context, data }) => {
     const { userId } = context;
@@ -794,33 +867,49 @@ export const decidePriceRevision = createServerFn({ type: "mutation" })
     if (approved) {
       // Buyer approved price drop!
       // Update Resale Order prices
-      await supabaseAdmin.from("resale_orders").update({
-        final_price_paise: terms.price,
-        payout_paise: terms.payout,
-        commission_paise: terms.commission,
-        status: "sold", // moves back to sold/paid
-        updated_at: new Date().toISOString()
-      }).eq("id", orderId);
+      await supabaseAdmin
+        .from("resale_orders")
+        .update({
+          final_price_paise: terms.price,
+          payout_paise: terms.payout,
+          commission_paise: terms.commission,
+          status: "sold", // moves back to sold/paid
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", orderId);
 
       // Update Listing status to inspection_passed
-      await supabaseAdmin.from("listings").update({
-        status: "inspection_passed",
-        current_price_paise: terms.price,
-        updated_at: new Date().toISOString()
-      }).eq("id", order.listing_id);
+      await supabaseAdmin
+        .from("listings")
+        .update({
+          status: "inspection_passed",
+          current_price_paise: terms.price,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", order.listing_id);
 
       // Update approval record
-      await supabaseAdmin.from("buyer_approvals").update({
-        status: "approved",
-        decided_at: new Date().toISOString()
-      }).eq("id", approval.id);
+      await supabaseAdmin
+        .from("buyer_approvals")
+        .update({
+          status: "approved",
+          decided_at: new Date().toISOString(),
+        })
+        .eq("id", approval.id);
 
       // Update shipment tracking and order to in_transit
       await supabaseAdmin.from("resale_orders").update({ status: "in_transit" }).eq("id", orderId);
-      
-      const { data: shipment } = await supabaseAdmin.from("shipments").select("id").eq("order_id", orderId).single();
+
+      const { data: shipment } = await supabaseAdmin
+        .from("shipments")
+        .select("id")
+        .eq("order_id", orderId)
+        .single();
       if (shipment) {
-        await supabaseAdmin.from("shipments").update({ status: "in_transit", updated_at: new Date().toISOString() }).eq("id", shipment.id);
+        await supabaseAdmin
+          .from("shipments")
+          .update({ status: "in_transit", updated_at: new Date().toISOString() })
+          .eq("id", shipment.id);
         await supabaseAdmin.from("tracking_events").insert({
           shipment_id: shipment.id,
           status: "in_transit",
@@ -835,6 +924,7 @@ export const decidePriceRevision = createServerFn({ type: "mutation" })
           order_id: orderId,
           type: "refund",
           amount_paise: difference,
+          currency: "INR",
           status: "completed",
           payload: { reason: "price_revision_difference" },
         });
@@ -846,7 +936,7 @@ export const decidePriceRevision = createServerFn({ type: "mutation" })
             account_from: "escrow",
             account_to: "buyer",
             amount_paise: difference,
-          }
+          },
         ]);
       }
 
@@ -863,27 +953,37 @@ export const decidePriceRevision = createServerFn({ type: "mutation" })
       return { success: true, decision: "approved" };
     } else {
       // Buyer rejected price drop! Cancel order & refund full
-      await supabaseAdmin.from("resale_orders").update({
-        status: "cancelled",
-        updated_at: new Date().toISOString()
-      }).eq("id", orderId);
+      await supabaseAdmin
+        .from("resale_orders")
+        .update({
+          status: "cancelled",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", orderId);
 
-      await supabaseAdmin.from("listings").update({
-        status: "withdrawn",
-        updated_at: new Date().toISOString()
-      }).eq("id", order.listing_id);
+      await supabaseAdmin
+        .from("listings")
+        .update({
+          status: "withdrawn",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", order.listing_id);
 
       // Update approval record
-      await supabaseAdmin.from("buyer_approvals").update({
-        status: "rejected",
-        decided_at: new Date().toISOString()
-      }).eq("id", approval.id);
+      await supabaseAdmin
+        .from("buyer_approvals")
+        .update({
+          status: "rejected",
+          decided_at: new Date().toISOString(),
+        })
+        .eq("id", approval.id);
 
       // Refund full amount to buyer
       await supabaseAdmin.from("payment_transactions").insert({
         order_id: orderId,
         type: "refund",
         amount_paise: order.final_price_paise,
+        currency: "INR",
         status: "completed",
         payload: { reason: "price_revision_rejected" },
       });
@@ -895,12 +995,19 @@ export const decidePriceRevision = createServerFn({ type: "mutation" })
           account_from: "escrow",
           account_to: "buyer",
           amount_paise: order.final_price_paise,
-        }
+        },
       ]);
 
-      const { data: shipment } = await supabaseAdmin.from("shipments").select("id").eq("order_id", orderId).single();
+      const { data: shipment } = await supabaseAdmin
+        .from("shipments")
+        .select("id")
+        .eq("order_id", orderId)
+        .single();
       if (shipment) {
-        await supabaseAdmin.from("shipments").update({ status: "returned", updated_at: new Date().toISOString() }).eq("id", shipment.id);
+        await supabaseAdmin
+          .from("shipments")
+          .update({ status: "returned", updated_at: new Date().toISOString() })
+          .eq("id", shipment.id);
         await supabaseAdmin.from("tracking_events").insert({
           shipment_id: shipment.id,
           status: "returned_to_seller",
@@ -923,13 +1030,13 @@ export const decidePriceRevision = createServerFn({ type: "mutation" })
   });
 
 // 8. Submit dispute (Buyer raises dispute within 48h)
-export const submitDispute = createServerFn({ type: "mutation" })
+export const submitDispute = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(
     z.object({
       orderId: z.string().uuid(),
       reason: z.string(),
-    })
+    }),
   )
   .handler(async ({ context, data }) => {
     const { userId } = context;
@@ -976,14 +1083,14 @@ export const submitDispute = createServerFn({ type: "mutation" })
   });
 
 // 9. Admin Resolve Dispute & Release Payout
-export const adminResolveDispute = createServerFn({ type: "mutation" })
+export const adminResolveDispute = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(
     z.object({
       disputeId: z.string().uuid(),
       resolutionAction: z.enum(["refund", "release_payout"]),
       notes: z.string(),
-    })
+    }),
   )
   .handler(async ({ context, data }) => {
     const { userId } = context;
@@ -1010,14 +1117,23 @@ export const adminResolveDispute = createServerFn({ type: "mutation" })
 
     if (resolutionAction === "refund") {
       // Refund buyer
-      await supabaseAdmin.from("disputes").update({
-        status: "resolved_refunded",
-        resolution: notes,
-        updated_at: new Date().toISOString(),
-      }).eq("id", disputeId);
+      await supabaseAdmin
+        .from("disputes")
+        .update({
+          status: "resolved_refunded",
+          resolution: notes,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", disputeId);
 
-      await supabaseAdmin.from("resale_orders").update({ status: "refunded", updated_at: new Date().toISOString() }).eq("id", order.id);
-      await supabaseAdmin.from("listings").update({ status: "withdrawn" }).eq("id", order.listing_id);
+      await supabaseAdmin
+        .from("resale_orders")
+        .update({ status: "refunded", updated_at: new Date().toISOString() })
+        .eq("id", order.id);
+      await supabaseAdmin
+        .from("listings")
+        .update({ status: "withdrawn" })
+        .eq("id", order.listing_id);
 
       await supabaseAdmin.from("payment_transactions").insert({
         order_id: order.id,
@@ -1034,18 +1150,23 @@ export const adminResolveDispute = createServerFn({ type: "mutation" })
           account_from: "escrow",
           account_to: "buyer",
           amount_paise: order.final_price_paise,
-        }
+        },
       ]);
-      
     } else {
       // Release payout to seller
-      await supabaseAdmin.from("disputes").update({
-        status: "resolved_released",
-        resolution: notes,
-        updated_at: new Date().toISOString(),
-      }).eq("id", disputeId);
+      await supabaseAdmin
+        .from("disputes")
+        .update({
+          status: "resolved_released",
+          resolution: notes,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", disputeId);
 
-      await supabaseAdmin.from("resale_orders").update({ status: "completed", updated_at: new Date().toISOString() }).eq("id", order.id);
+      await supabaseAdmin
+        .from("resale_orders")
+        .update({ status: "completed", updated_at: new Date().toISOString() })
+        .eq("id", order.id);
       await supabaseAdmin.from("listings").update({ status: "paid" }).eq("id", order.listing_id);
 
       // Create seller payout
@@ -1073,7 +1194,7 @@ export const adminResolveDispute = createServerFn({ type: "mutation" })
           account_from: "escrow",
           account_to: "myntra_commission",
           amount_paise: order.commission_paise,
-        }
+        },
       ]);
     }
 
@@ -1081,7 +1202,7 @@ export const adminResolveDispute = createServerFn({ type: "mutation" })
   });
 
 // 10. Release seller payout (called after protection window)
-export const releaseSellerPayout = createServerFn({ type: "mutation" })
+export const releaseSellerPayout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(z.object({ orderId: z.string().uuid() }))
   .handler(async ({ context, data }) => {
@@ -1116,19 +1237,26 @@ export const releaseSellerPayout = createServerFn({ type: "mutation" })
       seller_id: order.seller_id,
       order_id: orderId,
       amount_paise: order.payout_paise,
+      method: "credits",
       status: "paid",
       released_at: new Date().toISOString(),
     });
 
-    await supabaseAdmin.from("resale_orders").update({
-      status: "completed",
-      updated_at: new Date().toISOString()
-    }).eq("id", orderId);
+    await supabaseAdmin
+      .from("resale_orders")
+      .update({
+        status: "completed",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", orderId);
 
-    await supabaseAdmin.from("listings").update({
-      status: "paid",
-      updated_at: new Date().toISOString()
-    }).eq("id", order.listing_id);
+    await supabaseAdmin
+      .from("listings")
+      .update({
+        status: "paid",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", order.listing_id);
 
     // Ledger transactions
     await supabaseAdmin.from("ledger_entries").insert([
@@ -1145,7 +1273,7 @@ export const releaseSellerPayout = createServerFn({ type: "mutation" })
         account_from: "escrow",
         account_to: "myntra_commission",
         amount_paise: order.commission_paise,
-      }
+      },
     ]);
 
     await supabaseAdmin.from("listing_events").insert({
@@ -1162,7 +1290,7 @@ export const releaseSellerPayout = createServerFn({ type: "mutation" })
   });
 
 // 11. Fetch listings for Discovery Feed
-export const fetchListings = createServerFn({ type: "query" })
+export const fetchListings = createServerFn({ method: "GET" })
   .validator(
     z.object({
       category: z.string().optional(),
@@ -1171,14 +1299,15 @@ export const fetchListings = createServerFn({ type: "query" })
       priceSort: z.enum(["asc", "desc"]).optional(),
       discountSort: z.enum(["asc", "desc"]).optional(),
       search: z.string().optional(),
-    })
+    }),
   )
   .handler(async ({ data }) => {
     const { category, brand, size, search, priceSort } = data;
 
     let query = supabaseAdmin
       .from("listings")
-      .select(`
+      .select(
+        `
         id,
         title,
         brand,
@@ -1191,11 +1320,18 @@ export const fetchListings = createServerFn({ type: "query" })
         seller_id,
         source_order_item_id,
         created_at,
+        myntra_order_items (
+          original_price_paise,
+          myntra_orders (
+            delivered_at
+          )
+        ),
         listing_media (
           storage_key,
           angle
         )
-      `)
+      `,
+      )
       .eq("status", "live");
 
     if (category) query = query.eq("category", category);
@@ -1215,27 +1351,53 @@ export const fetchListings = createServerFn({ type: "query" })
     // Map to client format
     return (queryListings ?? []).map((l: any) => {
       const media = l.listing_media || [];
-      const imagePath = media.find((m: any) => m.angle === "top")?.storage_key || media[0]?.storage_key || "";
-      const publicUrl = imagePath ? `${process.env.SUPABASE_URL}/storage/v1/object/public/resell-photos/${imagePath}` : "https://picsum.photos/seed/resell-default/600/750";
+      const imagePath =
+        media.find((m: any) => m.angle === "top")?.storage_key || media[0]?.storage_key || "";
+      const publicUrl = imagePath
+        ? `${process.env.SUPABASE_URL}/storage/v1/object/public/resell-photos/${imagePath}`
+        : "https://picsum.photos/seed/resell-default/600/750";
+
+      const orderItem = l.myntra_order_items || {};
+      const order = orderItem.myntra_orders || {};
+      const originalPrice = orderItem.original_price_paise
+        ? Number(orderItem.original_price_paise) / 100
+        : (Number(l.current_price_paise) / 100) / 0.7;
+
+      const purchaseDate = order.delivered_at ? new Date(order.delivered_at) : new Date();
+      const ageYears = Math.max(
+        0.1,
+        (new Date().getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25),
+      );
+
+      const gallery = media.map(
+        (m: any) => `${process.env.SUPABASE_URL}/storage/v1/object/public/resell-photos/${m.storage_key}`,
+      );
+      if (gallery.length === 0) {
+        gallery.push(publicUrl);
+      }
 
       return {
         id: l.id,
         brand: l.brand,
         title: l.title,
-        category: l.category,
-        size: l.size,
+        category: l.category || "Outerwear",
+        size: l.size || "M",
+        originalPrice: originalPrice,
+        ageYears: ageYears,
         declaredGrade: l.declared_grade,
-        confirmedGrade: l.confirmed_grade,
-        price: l.current_price_paise / 100, // paise to INR
+        confirmedGrade: l.confirmed_grade || undefined,
+        seller: "Verified Seller",
+        sellerScore: 4.8,
         image: publicUrl,
+        gallery: gallery,
         verified: true,
-        inspected: !!l.confirmed_grade,
+        inspected: l.confirmed_grade !== null,
         status: l.status,
       };
     });
   });
 
-export const setSimulatedRole = createServerFn({ type: "mutation" })
+export const setSimulatedRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(z.object({ role: z.enum(["buyer", "seller", "inspector", "admin", "guest"]) }))
   .handler(async ({ context, data }) => {
@@ -1248,12 +1410,12 @@ export const setSimulatedRole = createServerFn({ type: "mutation" })
     if (role === "admin") {
       await supabaseAdmin.from("user_roles").insert([
         { user_id: userId, role: "admin" },
-        { user_id: userId, role: "inspector" }
+        { user_id: userId, role: "inspector" },
       ]);
     } else if (role === "inspector") {
       await supabaseAdmin.from("user_roles").insert({
         user_id: userId,
-        role: "inspector"
+        role: "inspector",
       });
     }
 

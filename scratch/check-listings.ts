@@ -30,7 +30,7 @@ const url = process.env.SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!url || !key) {
-  console.error("Error: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing in your .env file.");
+  console.error("Missing env keys!");
   process.exit(1);
 }
 
@@ -39,12 +39,36 @@ const supabase = createClient(url, key);
 async function check() {
   const { data, error } = await supabase
     .from("listings")
-    .select("id, status, source_order_item_id");
+    .select(`
+      id,
+      title,
+      brand,
+      category,
+      size,
+      current_price_paise,
+      declared_grade,
+      confirmed_grade,
+      status,
+      seller_id,
+      source_order_item_id,
+      created_at,
+      myntra_order_items (
+        original_price_paise,
+        myntra_orders (
+          delivered_at
+        )
+      ),
+      listing_media (
+        storage_key,
+        angle
+      )
+    `)
+    .limit(1);
   
   if (error) {
-    console.error("Error fetching listings:", error.message);
+    console.error("PostgREST Error Detail:", error);
   } else {
-    console.log("Current Listings in DB:", data);
+    console.log("Success! Data fetched:", data);
   }
 }
 

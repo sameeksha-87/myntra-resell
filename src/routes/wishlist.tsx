@@ -51,8 +51,8 @@ function WishlistPage() {
         product_data: row.product_data,
         size: row.product_data.size,
         quantity: 1,
-      },
-      { onConflict: "user_id,product_id" },
+      } as any,
+      { onConflict: "user_id,product_id" } as any,
     );
     if (error) return toast.error(error.message);
     await supabase.from("wishlist_items").delete().eq("id", row.id);

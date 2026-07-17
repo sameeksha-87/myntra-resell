@@ -33,9 +33,11 @@ function Index() {
   useEffect(() => {
     setLoading(true);
     fetchListings({
-      category: selectedCategory,
-      priceSort: priceSort,
-      search: searchQuery || undefined,
+      data: {
+        category: selectedCategory,
+        priceSort: priceSort,
+        search: searchQuery || undefined,
+      }
     })
       .then((data) => {
         setDbListings(data);

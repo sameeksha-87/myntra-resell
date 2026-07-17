@@ -13,6 +13,7 @@ import {
   Truck,
   RotateCcw,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -53,7 +54,7 @@ function ProductPage() {
   const [loading, setLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [wished, setWished] = useState(false);
-  const [busy, setBusy] = useState<"" | "bag" | "wish">("");
+  const [busy, setBusy] = useState<"" | "bag" | "wish" | "delete">("");
 
   // Verification checks from DB
   const [verifChecks, setVerifChecks] = useState<any[]>([]);
@@ -77,7 +78,7 @@ function ProductPage() {
 
     try {
       // Query normalized listing joined with profile, order specs and media
-      const { data, error } = await supabase
+      const { data: rawData, error } = await supabase
         .from("listings")
         .select(`
           id,
@@ -92,10 +93,6 @@ function ProductPage() {
           seller_id,
           source_order_item_id,
           created_at,
-          profiles (
-            full_name,
-            seller_score
-          ),
           myntra_order_items (
             original_price_paise,
             myntra_orders (
@@ -110,16 +107,22 @@ function ProductPage() {
         .eq("id", id)
         .single();
 
-      if (error || !data) throw new Error("Listing not found");
+      if (error || !rawData) throw new Error("Listing not found");
 
-      const profile = data.profiles as any || {};
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, seller_score")
+        .eq("id", rawData.seller_id)
+        .maybeSingle();
+
+      const data = rawData as any;
       const orderItem = data.myntra_order_items as any || {};
       const order = orderItem.myntra_orders as any || {};
       const media = data.listing_media || [];
 
       // Format photo gallery from storage keys
       const gallery = media.map(
-        (m: any) => `${process.env.SUPABASE_URL}/storage/v1/object/public/resell-photos/${m.storage_key}`
+        (m: any) => `${(supabase as any).supabaseUrl}/storage/v1/object/public/resell-photos/${m.storage_key}`
       );
       if (gallery.length === 0) {
         // Fallback demo image if storage bucket fails
@@ -144,8 +147,9 @@ function ProductPage() {
         ageYears: ageYears,
         declaredGrade: data.declared_grade,
         confirmedGrade: data.confirmed_grade,
-        seller: profile.full_name || "Verified Seller",
-        sellerScore: Number(profile.seller_score) || 4.7,
+        seller: profile?.full_name || "Verified Seller",
+        sellerScore: Number(profile?.seller_score) || 4.7,
+        seller_id: data.seller_id,
         image: gallery[0],
         gallery: gallery,
         verified: true,
@@ -173,7 +177,7 @@ function ProductPage() {
         const { data: checks } = await supabase
           .from("verification_checks")
           .select("check_type, status, score, threshold")
-          .eq("verification_run_id", runs[0].id);
+          .eq("verification_run_id", runs[0].id!);
         if (checks) setVerifChecks(checks);
       }
     } catch (err) {
@@ -244,7 +248,7 @@ function ProductPage() {
       confirmed_grade: mockProduct.confirmedGrade,
       status: "live",
       current_price_paise: currentPricePaise,
-    });
+    } as any);
 
     if (error) throw new Error(`Mock migration failed: ${error.message}`);
     return deterministicId;
@@ -275,7 +279,7 @@ function ProductPage() {
         listing_id: dbListingId,
         size: product.size,
         quantity: 1,
-      });
+      } as any);
 
       if (error) throw error;
 
@@ -308,13 +312,36 @@ function ProductPage() {
         const { error } = await supabase.from("wishlist_items").insert({
           user_id: user.id,
           listing_id: dbListingId,
-        });
+        } as any);
         if (error) throw error;
         setWished(true);
         toast.success("Added to wishlist");
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to update wishlist");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const deleteListing = async () => {
+    if (
+      !confirm(
+        "Are you sure you want to delete this listing? It will be removed from the marketplace and returned to your closet.",
+      )
+    )
+      return;
+    setBusy("delete");
+    try {
+      const { error } = await supabase.from("listings").delete().eq("id", product.id);
+
+      if (error) throw error;
+
+      toast.success("Listing deleted successfully");
+      navigate({ to: "/orders" });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to delete listing");
     } finally {
       setBusy("");
     }
@@ -334,6 +361,7 @@ function ProductPage() {
   }
 
   const grade = product.confirmedGrade || product.declaredGrade;
+  const isSeller = user && product && product.seller_id === user.id;
   
   // Custom price formulas
   const priceFormula = product.priceFormula || {
@@ -426,22 +454,42 @@ function ProductPage() {
             </div>
           </div>
 
-          <div className="mt-6 flex gap-3">
-            <button
-              onClick={addToBag}
-              disabled={busy === "bag" || product.status !== "live"}
-              className="flex-1 rounded-md bg-primary py-3.5 text-sm font-bold uppercase tracking-wide text-primary-foreground hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
-            >
-              {busy === "bag" ? "Adding…" : product.status !== "live" ? "Unavailable" : "Add to Bag"}
-            </button>
-            <button
-              onClick={toggleWishlist}
-              disabled={busy === "wish"}
-              className={`flex items-center gap-2 rounded-md border px-5 py-3.5 text-sm font-bold uppercase tracking-wide cursor-pointer ${wished ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-foreground"}`}
-            >
-              <Heart className={`h-4 w-4 ${wished ? "fill-primary text-primary" : ""}`} />{" "}
-              {wished ? "Wishlisted" : "Wishlist"}
-            </button>
+          <div className="mt-6 flex flex-col gap-3 w-full">
+            {isSeller ? (
+              <button
+                onClick={deleteListing}
+                disabled={busy === "delete"}
+                className="w-full rounded-md bg-destructive py-3.5 text-sm font-bold uppercase tracking-wide text-white hover:bg-destructive/90 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                {busy === "delete" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Deleting Listing…
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" /> Delete Resell Listing
+                  </>
+                )}
+              </button>
+            ) : (
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={addToBag}
+                  disabled={busy === "bag" || product.status !== "live"}
+                  className="flex-1 rounded-md bg-primary py-3.5 text-sm font-bold uppercase tracking-wide text-primary-foreground hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
+                >
+                  {busy === "bag" ? "Adding…" : product.status !== "live" ? "Unavailable" : "Add to Bag"}
+                </button>
+                <button
+                  onClick={toggleWishlist}
+                  disabled={busy === "wish"}
+                  className={`flex items-center gap-2 rounded-md border px-5 py-3.5 text-sm font-bold uppercase tracking-wide cursor-pointer ${wished ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-foreground"}`}
+                >
+                  <Heart className={`h-4 w-4 ${wished ? "fill-primary text-primary" : ""}`} />{" "}
+                  {wished ? "Wishlisted" : "Wishlist"}
+                </button>
+              </div>
+            )}
             <button
               onClick={() => {
                 navigator.clipboard.writeText(window.location.href);

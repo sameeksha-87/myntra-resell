@@ -37,7 +37,7 @@ function ProfilePage() {
     supabase
       .from("listings")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
+      .eq("seller_id", user.id)
       .then(({ count }) => {
         setListingCount(count ?? 0);
       });

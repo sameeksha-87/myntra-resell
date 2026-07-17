@@ -95,7 +95,7 @@ function CheckoutPage() {
           const media = l.listing_media || [];
           const imagePath = media[0]?.storage_key || "";
           const publicUrl = imagePath
-            ? `${process.env.SUPABASE_URL}/storage/v1/object/public/resell-photos/${imagePath}`
+            ? `${(supabase as any).supabaseUrl}/storage/v1/object/public/resell-photos/${imagePath}`
             : "https://picsum.photos/seed/resell-default/600/750";
 
           return {
@@ -164,7 +164,7 @@ function CheckoutPage() {
           recipient: newAddress.recipient,
           phone: newAddress.phone,
           line1: newAddress.line1,
-          line2: newAddress.line2 || null,
+          line2: newAddress.line2 || "",
           city: newAddress.city,
           state: newAddress.state,
           pincode: newAddress.pincode,

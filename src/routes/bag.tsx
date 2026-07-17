@@ -67,7 +67,7 @@ function BagPage() {
         const media = l.listing_media || [];
         const imagePath = media.find((m: any) => m.angle === "top")?.storage_key || media[0]?.storage_key || "";
         const publicUrl = imagePath
-          ? `${process.env.SUPABASE_URL}/storage/v1/object/public/resell-photos/${imagePath}`
+          ? `${(supabase as any).supabaseUrl}/storage/v1/object/public/resell-photos/${imagePath}`
           : "https://picsum.photos/seed/resell-default/600/750";
 
         const price = l.current_price_paise ? Number(l.current_price_paise) / 100 : 0;

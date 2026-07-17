@@ -20,6 +20,8 @@ import { setSimulatedRole } from "@/integrations/supabase/actions.server";
 import { Sliders, Shield } from "lucide-react";
 import { toast } from "sonner";
 
+import { supabase } from "@/integrations/supabase/client";
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -144,7 +146,8 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function RoleSwitcher() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
+  const signOut = () => supabase.auth.signOut();
   const [role, setRole] = useState<string>(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("simulated_role") || "seller";

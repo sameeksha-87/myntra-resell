@@ -1,7 +1,7 @@
 // src/routes/listing.$id.tsx
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
-import { Check, PackageCheck, ShieldCheck, Truck, Wallet, Sparkles, AlertTriangle, MessageSquare, Loader2, ArrowLeft, XCircle } from "lucide-react";
+import { Check, PackageCheck, ShieldCheck, Truck, Wallet, Sparkles, AlertTriangle, MessageSquare, Loader2, ArrowLeft, XCircle, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -139,9 +139,9 @@ function ListingStatus() {
     );
   }
 
-  const isSeller = listing.seller_id === user.id;
+  const isSeller = listing.seller_id === user?.id;
   const order = listing.resale_orders;
-  const isBuyer = order && order.buyer_id === user.id;
+  const isBuyer = order && order.buyer_id === user?.id;
 
   const currentStatus = order?.status || listing.status;
 

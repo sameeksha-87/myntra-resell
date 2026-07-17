@@ -2,7 +2,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { inr } from "@/lib/mock-data";
-import { ArrowRight, PackageCheck, Sparkles, AlertCircle, ShoppingBag, Loader2, ClipboardList, ShoppingCart, RefreshCw, ChevronRight } from "lucide-react";
+import { ArrowRight, PackageCheck, Sparkles, AlertCircle, ShoppingBag, Loader2, ClipboardList, ShoppingCart, RefreshCw, ChevronRight, Package } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/orders")({
   component: OrdersPage,
 });
 
-type Tab = "closet" | "purchases";
+type Tab = "closet" | "purchases" | "listings";
 
 function OrdersPage() {
   const { user, loading: authLoading } = useAuth();
@@ -33,6 +33,10 @@ function OrdersPage() {
   // Purchased items (resale orders bought by the user)
   const [purchases, setPurchases] = useState<any[]>([]);
   const [purchasesLoading, setPurchasesLoading] = useState(true);
+
+  // Listings uploaded by this user for selling
+  const [myListings, setMyListings] = useState<any[]>([]);
+  const [listingsLoading, setListingsLoading] = useState(true);
 
   const fetchCloset = async () => {
     setClosetLoading(true);
@@ -129,7 +133,7 @@ function OrdersPage() {
         const media = l.listing_media || [];
         const imagePath = media[0]?.storage_key || "";
         const publicUrl = imagePath
-          ? `${process.env.SUPABASE_URL}/storage/v1/object/public/resell-photos/${imagePath}`
+          ? `${(supabase as any).supabaseUrl}/storage/v1/object/public/resell-photos/${imagePath}`
           : "https://picsum.photos/seed/resell-default/600/750";
 
         return {
@@ -156,6 +160,60 @@ function OrdersPage() {
     }
   };
 
+  const fetchMyListings = async () => {
+    setListingsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("listings")
+        .select(`
+          id,
+          title,
+          brand,
+          size,
+          current_price_paise,
+          declared_grade,
+          confirmed_grade,
+          status,
+          created_at,
+          source_order_item_id,
+          listing_media (
+            storage_key
+          )
+        `)
+        .eq("seller_id", user!.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const formatted = (data ?? []).map((l: any) => {
+        const media = l.listing_media || [];
+        const imagePath = media[0]?.storage_key || "";
+        const publicUrl = imagePath
+          ? `${(supabase as any).supabaseUrl}/storage/v1/object/public/resell-photos/${imagePath}`
+          : "https://picsum.photos/seed/resell-default/600/750";
+
+        return {
+          id: l.id,
+          title: l.title,
+          brand: l.brand,
+          size: l.size,
+          price: Number(l.current_price_paise) / 100,
+          image: publicUrl,
+          status: l.status,
+          created_at: l.created_at,
+          source_order_item_id: l.source_order_item_id,
+        };
+      });
+
+      setMyListings(formatted);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to load active listings");
+    } finally {
+      setListingsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!authLoading && !user) {
       navigate({ to: "/auth", search: { redirect: window.location.pathname }, replace: true });
@@ -164,6 +222,7 @@ function OrdersPage() {
     if (user) {
       fetchCloset();
       fetchPurchases();
+      fetchMyListings();
     }
   }, [user, authLoading, activeTab]);
 
@@ -181,7 +240,15 @@ function OrdersPage() {
     }
   };
 
-  const eligibleItems = closetItems.filter((i) => i.eligibility_decisions?.eligible);
+  const activeListingItemIds = new Set(
+    myListings
+      .filter((l) => !["verification_failed", "cancelled", "withdrawn"].includes(l.status))
+      .map((l) => l.source_order_item_id)
+  );
+
+  const eligibleItems = closetItems.filter(
+    (i) => i.eligibility_decisions?.eligible && !activeListingItemIds.has(i.id)
+  );
   const ineligibleItems = closetItems.filter((i) => !i.eligibility_decisions?.eligible);
 
   const getStatusBadge = (status: string) => {
@@ -207,7 +274,7 @@ function OrdersPage() {
     }
   };
 
-  if (authLoading || (activeTab === "closet" && closetLoading && !seeding) || (activeTab === "purchases" && purchasesLoading)) {
+  if (authLoading || (activeTab === "closet" && closetLoading && !seeding) || (activeTab === "purchases" && purchasesLoading) || (activeTab === "listings" && listingsLoading)) {
     return (
       <div className="min-h-screen bg-background">
         <SiteHeader />
@@ -248,6 +315,14 @@ function OrdersPage() {
             }`}
           >
             <ClipboardList className="h-4 w-4" /> Resell Closet ({closetItems.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("listings")}
+            className={`py-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === "listings" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Package className="h-4 w-4" /> My Listings ({myListings.length})
           </button>
           <button
             onClick={() => setActiveTab("purchases")}
@@ -445,6 +520,87 @@ function OrdersPage() {
                           className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-sm text-center"
                         >
                           {purchase.status === "buyer_approval_pending" ? "Resolve Terms" : "Track Order"} <ChevronRight className="h-4 w-4" />
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "listings" && (
+          <div>
+            <div className="mb-6 flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-black uppercase tracking-wide">
+                  Active Resell Listings · {myListings.length}
+                </h2>
+                <p className="text-xs text-muted-foreground">Monitor status, review pricing details, and check verification logs</p>
+              </div>
+              <button
+                onClick={fetchMyListings}
+                className="p-2 border border-border rounded-full hover:bg-muted text-muted-foreground cursor-pointer"
+                title="Refresh listings"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </button>
+            </div>
+
+            {myListings.length === 0 ? (
+              <div className="rounded-md border border-dashed border-border p-16 text-center bg-card shadow-sm">
+                <ShoppingBag className="mx-auto h-10 w-10 text-muted-foreground" />
+                <h3 className="mt-3 text-lg font-bold">No active listings</h3>
+                <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto text-pretty">
+                  Select an eligible item from your closet to list it on Myntra ReSell.
+                </p>
+                <button
+                  onClick={() => setActiveTab("closet")}
+                  className="mt-6 inline-block rounded-md bg-primary px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 transition shadow-sm cursor-pointer"
+                >
+                  View resell closet
+                </button>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {myListings.map((listing) => {
+                  const dateStr = new Date(listing.created_at).toLocaleDateString("en-IN", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  });
+                  return (
+                    <div
+                      key={listing.id}
+                      className="flex flex-col gap-4 rounded-md border border-border bg-card p-4 shadow-card md:flex-row md:items-center"
+                    >
+                      <img
+                        src={listing.image}
+                        alt={listing.title}
+                        className="h-24 w-20 flex-shrink-0 rounded-sm object-cover bg-muted border border-border"
+                      />
+                      <div className="flex-1 min-w-0 leading-normal">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] text-muted-foreground font-mono">LISTING ID: {listing.id.slice(0, 8).toUpperCase()}</span>
+                          <span className="text-[10px] text-muted-foreground">· Listed {dateStr}</span>
+                          {getStatusBadge(listing.status)}
+                        </div>
+                        <div className="mt-1 text-base font-bold text-foreground">{listing.brand}</div>
+                        <div className="text-sm text-muted-foreground truncate">{listing.title}</div>
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                          <span><b>Size:</b> {listing.size}</span>
+                          <span><b>Listing Price:</b> {inr(listing.price)}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-col gap-2 w-full md:w-auto">
+                        <Link
+                          to="/listing/$id"
+                          params={{ id: listing.id }}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-sm text-center"
+                        >
+                          Track Status <ChevronRight className="h-4 w-4" />
                         </Link>
                       </div>
                     </div>
