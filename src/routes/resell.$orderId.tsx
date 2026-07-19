@@ -15,6 +15,7 @@ import {
   Sliders,
   ChevronLeft,
   XCircle,
+  Wallet,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -36,7 +37,7 @@ export const Route = createFileRoute("/resell/$orderId")({
   component: ResellFlow,
 });
 
-type Step = 0 | 1 | 2 | 3 | 4;
+type Step = 0 | 1 | 2;
 
 const angles = [
   { key: "top", label: "Top Angle", tip: "Collar, shoulders, or top-down view" },
@@ -69,6 +70,8 @@ function ResellFlow() {
   const [step, setStep] = useState<Step>(0);
   const [photos, setPhotos] = useState<Record<string, string>>({});
   const [grade, setGrade] = useState<Grade>("Excellent");
+  const [enteredPrice, setEnteredPrice] = useState<string>("");
+  const [conditionDetails, setConditionDetails] = useState<string>("");
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState(false);
   const [verifFailed, setVerifFailed] = useState(false);
@@ -98,7 +101,8 @@ function ResellFlow() {
     setOrderLoading(true);
     supabase
       .from("myntra_order_items")
-      .select(`
+      .select(
+        `
         id,
         title,
         size,
@@ -108,7 +112,8 @@ function ResellFlow() {
           id,
           delivered_at
         )
-      `)
+      `,
+      )
       .eq("id", orderItemId)
       .single()
       .then(({ data, error }) => {
@@ -120,7 +125,10 @@ function ResellFlow() {
 
         const o = data.myntra_orders as any;
         const purchaseDate = new Date(o.delivered_at);
-        const ageYears = Math.max(0.1, (new Date().getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+        const ageYears = Math.max(
+          0.1,
+          (new Date().getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25),
+        );
 
         setOrder({
           id: data.id,
@@ -130,7 +138,10 @@ function ResellFlow() {
           category: "Outerwear",
           size: data.size,
           originalPrice: Number(data.original_price_paise) / 100,
-          purchaseDate: purchaseDate.toLocaleDateString("en-IN", { month: "short", year: "numeric" }),
+          purchaseDate: purchaseDate.toLocaleDateString("en-IN", {
+            month: "short",
+            year: "numeric",
+          }),
           ageYears: ageYears,
           image: data.image,
         });
@@ -142,15 +153,15 @@ function ResellFlow() {
 
   const price = useMemo(() => {
     if (!order) return { listPrice: 0, sellerPayout: 0, commission: 0, depreciation: 1, factor: 1 };
-    
+
     // Staging / preview formula: matches server algorithm
-    const gradeFactors = { Pristine: 1.0, Excellent: 0.85, Good: 0.70 };
+    const gradeFactors = { Pristine: 1.0, Excellent: 0.85, Good: 0.7 };
     const factor = gradeFactors[grade] || 0.85;
-    const depreciation = Math.max(0.2, 1.0 - 0.20 * order.ageYears);
+    const depreciation = Math.max(0.2, 1.0 - 0.2 * order.ageYears);
     const listPrice = Math.max(0, Math.round(order.originalPrice * depreciation * factor));
-    const sellerPayout = Math.round(listPrice * 0.60);
+    const sellerPayout = Math.round(listPrice * 0.6);
     const commission = listPrice - sellerPayout;
-    
+
     return {
       listPrice,
       sellerPayout,
@@ -160,9 +171,23 @@ function ResellFlow() {
     };
   }, [order, grade]);
 
+  const activePrice = useMemo(() => {
+    const aiEstimate = price.listPrice;
+    const listPrice =
+      enteredPrice && !isNaN(Number(enteredPrice)) ? Number(enteredPrice) : aiEstimate;
+    const sellerPayout = Math.round(listPrice * 0.6);
+    const commission = listPrice - sellerPayout;
+    return {
+      listPrice,
+      sellerPayout,
+      commission,
+      aiEstimate,
+    };
+  }, [price.listPrice, enteredPrice]);
+
   const startVerify = async () => {
     if (!user || !order) return;
-    setStep(3);
+    setStep(1);
     setVerifying(true);
     setVerifFailed(false);
     setScanStatus("Creating listing draft on server...");
@@ -173,7 +198,9 @@ function ResellFlow() {
         data: {
           orderItemId: order.id,
           declaredGrade: grade,
-        }
+          customPrice: enteredPrice ? Number(enteredPrice) : undefined,
+          conditionDetails: conditionDetails || undefined,
+        },
       });
       const currentListingId = draftResult.listingId;
       setListingId(currentListingId);
@@ -188,7 +215,7 @@ function ResellFlow() {
             listingId: currentListingId,
             angle: angle,
             imageBase64: photos[angle],
-          }
+          },
         });
       }
 
@@ -199,7 +226,7 @@ function ResellFlow() {
           listingId: currentListingId,
           simBlur,
           simWrongAngle,
-        }
+        },
       });
 
       setVerifying(false);
@@ -216,7 +243,7 @@ function ResellFlow() {
       console.error(err);
       toast.error(err.message || "Failed to submit listing");
       setVerifying(false);
-      setStep(2);
+      setStep(0);
     }
   };
 
@@ -333,7 +360,7 @@ function ResellFlow() {
 
       <div className="border-b border-border bg-muted/40">
         <div className="mx-auto flex max-w-4xl items-center gap-2 px-6 py-4 text-xs font-bold uppercase tracking-wide">
-          {["Photos", "Condition", "Price", "Verify", "Live"].map((s, i) => (
+          {["Upload & Details", "Verify", "Live"].map((s, i) => (
             <div key={s} className="flex items-center gap-2">
               <div
                 className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] ${i <= step ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
@@ -341,7 +368,7 @@ function ResellFlow() {
                 {i < step ? <Check className="h-3 w-3" /> : i + 1}
               </div>
               <span className={i === step ? "text-foreground" : "text-muted-foreground"}>{s}</span>
-              {i < 4 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+              {i < 2 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
             </div>
           ))}
         </div>
@@ -353,7 +380,16 @@ function ResellFlow() {
             <PhotoStep
               photos={photos}
               onTrigger={triggerCamera}
-              onContinue={() => setStep(1)}
+              grade={grade}
+              setGrade={setGrade}
+              enteredPrice={enteredPrice}
+              setEnteredPrice={setEnteredPrice}
+              conditionDetails={conditionDetails}
+              setConditionDetails={setConditionDetails}
+              aiEstimate={price.listPrice}
+              activePrice={activePrice}
+              order={order}
+              onContinue={startVerify}
               done={photosDone}
               scanningAngle={scanningAngle}
               scanStatus={scanStatus}
@@ -364,29 +400,12 @@ function ResellFlow() {
             />
           )}
           {step === 1 && (
-            <GradeStep
-              grade={grade}
-              setGrade={setGrade}
-              onBack={() => setStep(0)}
-              onContinue={() => setStep(2)}
-            />
-          )}
-          {step === 2 && (
-            <PriceStep
-              price={price}
-              order={order}
-              grade={grade}
-              onBack={() => setStep(1)}
-              onContinue={startVerify}
-            />
-          )}
-          {step === 3 && (
             <VerifyStep
               verifying={verifying}
               verified={verified}
               failed={verifFailed}
               reason={verifReason}
-              onContinue={() => setStep(4)}
+              onContinue={() => setStep(2)}
               onBack={() => {
                 setStep(0); // Let them retake photos if verification failed
                 setVerified(false);
@@ -394,7 +413,7 @@ function ResellFlow() {
               }}
             />
           )}
-          {step === 4 && (
+          {step === 2 && (
             <LiveStep
               onView={() =>
                 navigate({ to: "/listing/$id", params: { id: listingId ?? order.orderId } })
@@ -417,9 +436,15 @@ function ResellFlow() {
               <div className="text-sm font-bold">{order.brand}</div>
               <div className="text-xs text-muted-foreground leading-snug">{order.title}</div>
               <div className="mt-2 text-[11px] text-muted-foreground space-y-0.5">
-                <div><b>Size:</b> {order.size}</div>
-                <div><b>Bought:</b> {order.purchaseDate}</div>
-                <div><b>Original Price:</b> {inr(order.originalPrice)}</div>
+                <div>
+                  <b>Size:</b> {order.size}
+                </div>
+                <div>
+                  <b>Bought:</b> {order.purchaseDate}
+                </div>
+                <div>
+                  <b>Original Price:</b> {inr(order.originalPrice)}
+                </div>
               </div>
             </div>
           </div>
@@ -428,9 +453,9 @@ function ResellFlow() {
 
           <SummaryRow label="Photos" value={`${photosDone} / ${angles.length}`} />
           <SummaryRow label="Declared grade" value={grade} />
-          <SummaryRow label="Provisional price" value={inr(price.listPrice)} bold />
-          <SummaryRow label="Your payout (60%)" value={inr(price.sellerPayout)} accent />
-          <SummaryRow label="Myntra fee (40%)" value={inr(price.commission)} />
+          <SummaryRow label="Provisional price" value={inr(activePrice.listPrice)} bold />
+          <SummaryRow label="Your payout (60%)" value={inr(activePrice.sellerPayout)} accent />
+          <SummaryRow label="Myntra fee (40%)" value={inr(activePrice.commission)} />
 
           <div className="mt-3 rounded-sm bg-accent/50 p-2.5 text-[11px] text-accent-foreground leading-relaxed">
             <ShieldCheck className="mr-1 inline h-3.5 w-3.5 text-success" />
@@ -470,6 +495,17 @@ function Loader2Icon(props: any) {
 interface PhotoStepProps {
   photos: Record<string, string>;
   onTrigger: (key: string) => void;
+  grade: Grade;
+  setGrade: (g: Grade) => void;
+  enteredPrice: string;
+  setEnteredPrice: (p: string) => void;
+  conditionDetails: string;
+  setConditionDetails: (d: string) => void;
+  aiEstimate: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  activePrice: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  order: any;
   onContinue: () => void;
   done: number;
   scanningAngle: string | null;
@@ -483,6 +519,15 @@ interface PhotoStepProps {
 function PhotoStep({
   photos,
   onTrigger,
+  grade,
+  setGrade,
+  enteredPrice,
+  setEnteredPrice,
+  conditionDetails,
+  setConditionDetails,
+  aiEstimate,
+  activePrice,
+  order,
   onContinue,
   done,
   scanningAngle,
@@ -494,9 +539,10 @@ function PhotoStep({
 }: PhotoStepProps) {
   return (
     <section>
-      <h2 className="text-2xl font-black">Add photos of your item</h2>
+      <h2 className="text-2xl font-black">Add photos & details of your item</h2>
       <p className="mt-1 text-sm text-muted-foreground text-pretty">
-        Use the in-app camera viewfinder to capture each perspective angle. Local file system selection is disabled as an anti-fraud measure.
+        Use the in-app camera viewfinder to capture each perspective angle. Local file system
+        selection is disabled as an anti-fraud measure.
       </p>
 
       <div className="mt-4 rounded-md border border-dashed border-primary bg-primary/5 p-4 text-sm">
@@ -584,6 +630,96 @@ function PhotoStep({
         })}
       </div>
 
+      {/* Condition & details section */}
+      <div className="mt-6 rounded-md border border-border bg-card p-5 shadow-card">
+        <h3 className="text-base font-bold uppercase tracking-wider flex items-center gap-1.5 mb-4 text-foreground border-b border-border pb-2">
+          <Sliders className="h-5 w-5 text-primary" /> Product Condition & Details
+        </h3>
+
+        {/* Grade picker */}
+        <div className="mb-4">
+          <label className="block text-xs font-bold uppercase text-muted-foreground mb-2">
+            Condition Grade
+          </label>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {grades.map((g) => (
+              <button
+                key={g.grade}
+                type="button"
+                onClick={() => setGrade(g.grade)}
+                className={`rounded-md border p-3 text-left transition cursor-pointer text-xs ${grade === g.grade ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:border-foreground bg-background"}`}
+              >
+                <div className="font-black text-sm">{g.grade}</div>
+                <div className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">
+                  {g.example}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold uppercase text-muted-foreground mb-1.5">
+            Details about product condition
+          </label>
+          <textarea
+            placeholder="e.g. Only worn twice, looks brand new. No tears, stains, or damage. Comes with original tag."
+            value={conditionDetails}
+            onChange={(e) => setConditionDetails(e.target.value)}
+            rows={3}
+            className="w-full rounded-md border border-border bg-background p-3 text-sm focus:border-primary focus:outline-none placeholder:text-muted-foreground/60"
+          />
+        </div>
+      </div>
+
+      {/* Price section */}
+      <div className="mt-6 rounded-md border border-border bg-card p-5 shadow-card">
+        <h3 className="text-base font-bold uppercase tracking-wider flex items-center gap-1.5 mb-4 text-foreground border-b border-border pb-2">
+          <Wallet className="h-5 w-5 text-primary" /> Pricing & Payout
+        </h3>
+
+        <div className="grid gap-4 sm:grid-cols-2 items-start">
+          <div>
+            <label className="block text-xs font-bold uppercase text-muted-foreground mb-1.5">
+              Resale price (₹)
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-2.5 text-sm font-bold text-muted-foreground">
+                ₹
+              </span>
+              <input
+                type="number"
+                placeholder={String(aiEstimate)}
+                value={enteredPrice}
+                onChange={(e) => setEnteredPrice(e.target.value)}
+                className="w-full rounded-md border border-border bg-background py-2 pl-7 pr-3 text-sm font-bold focus:border-primary focus:outline-none"
+              />
+            </div>
+            <p className="mt-1.5 text-[11px] text-muted-foreground leading-snug">
+              AI suggests reselling for{" "}
+              <span
+                className="font-bold text-primary cursor-pointer hover:underline"
+                onClick={() => setEnteredPrice(String(aiEstimate))}
+              >
+                ₹{aiEstimate}
+              </span>{" "}
+              based on original price ({inr(order.originalPrice)}) and {grade} condition.
+            </p>
+          </div>
+
+          <div className="rounded-md bg-muted/40 p-3 text-xs divide-y divide-border">
+            <div className="flex justify-between pb-2">
+              <span className="text-muted-foreground font-semibold">Your payout (60%)</span>
+              <span className="text-success font-black">{inr(activePrice.sellerPayout)}</span>
+            </div>
+            <div className="flex justify-between pt-2">
+              <span className="text-muted-foreground font-semibold">Myntra resell fee (40%)</span>
+              <span className="font-bold">{inr(activePrice.commission)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="mt-6 rounded-md border border-border bg-accent/40 p-3.5 text-xs leading-relaxed">
         <div className="mb-1 font-bold uppercase tracking-wide flex items-center gap-1.5">
           <ShieldCheck className="h-4 w-4 text-success" /> Live capture guardrails active
@@ -601,7 +737,7 @@ function PhotoStep({
           disabled={done < angles.length}
           className="rounded-md bg-primary px-6 py-3 text-sm font-bold uppercase tracking-wide text-primary-foreground disabled:opacity-40 cursor-pointer"
         >
-          Continue Condition Declaration ({done}/{angles.length})
+          Verify & Publish Listing ({done}/{angles.length})
         </button>
       </div>
     </section>
@@ -797,132 +933,6 @@ function CameraModal({
   );
 }
 
-function GradeStep({
-  grade,
-  setGrade,
-  onBack,
-  onContinue,
-}: {
-  grade: Grade;
-  setGrade: (g: Grade) => void;
-  onBack: () => void;
-  onContinue: () => void;
-}) {
-  return (
-    <section>
-      <h2 className="text-2xl font-black">Rate the condition honestly</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Our delivery partner re-confirms this at pickup. Misdeclared grades affect your seller score
-        and future payouts.
-      </p>
-      <div className="mt-4 grid gap-3">
-        {grades.map((g) => (
-          <button
-            key={g.grade}
-            onClick={() => setGrade(g.grade)}
-            className={`rounded-md border-2 p-4 text-left transition cursor-pointer ${grade === g.grade ? "border-primary bg-primary/5" : "border-border hover:border-foreground"}`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="text-lg font-black">{g.grade}</div>
-              <div
-                className={`text-xs font-bold uppercase ${grade === g.grade ? "text-primary" : "text-muted-foreground"}`}
-              >
-                {g.example}
-              </div>
-            </div>
-            <div className="mt-1 text-sm text-muted-foreground">{g.blurb}</div>
-          </button>
-        ))}
-      </div>
-      <div className="mt-4 flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs leading-relaxed">
-        <AlertTriangle className="mt-0.5 h-4 w-4 text-warning-foreground" />
-        <div>
-          Overstating grade twice forfeits your ₹79 seller deposit and can restrict future listings.
-        </div>
-      </div>
-      <div className="mt-6 flex justify-between">
-        <button
-          onClick={onBack}
-          className="rounded-md border border-border px-6 py-3 text-sm font-bold uppercase cursor-pointer"
-        >
-          Back
-        </button>
-        <button
-          onClick={onContinue}
-          className="rounded-md bg-primary px-6 py-3 text-sm font-bold uppercase text-primary-foreground cursor-pointer"
-        >
-          Continue
-        </button>
-      </div>
-    </section>
-  );
-}
-
-interface PriceStepProps {
-  price: any;
-  order: any;
-  grade: Grade;
-  onBack: () => void;
-  onContinue: () => void;
-}
-
-function PriceStep({ price, order, grade, onBack, onContinue }: PriceStepProps) {
-  return (
-    <section>
-      <h2 className="text-2xl font-black">Your provisional price</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Fully transparent breakdown. Buyer sees this labelled "AI-estimated".
-      </p>
-
-      <div className="mt-4 overflow-hidden rounded-md border border-border">
-        <div className="bg-gradient-hero p-6 text-white">
-          <div className="text-xs font-bold uppercase tracking-widest text-white/80">
-            Listing Price
-          </div>
-          <div className="mt-1 text-4xl font-black">{inr(price.listPrice)}</div>
-          <div className="mt-1 text-sm text-white/85">
-            You receive <b>{inr(price.sellerPayout)}</b> after inspection
-          </div>
-        </div>
-        <div className="divide-y divide-border text-sm">
-          <BreakRow label="Original Myntra price" value={inr(order.originalPrice)} />
-          <BreakRow
-            label={`Depreciation · ${order.ageYears.toFixed(1)} yr × 20%`}
-            value={`× ${price.depreciation.toFixed(2)}`}
-          />
-          <BreakRow label={`Grade factor · ${grade}`} value={`× ${price.factor.toFixed(2)}`} />
-          <BreakRow label="Final listing price" value={inr(price.listPrice)} bold />
-          <BreakRow label="Seller payout (60%)" value={inr(price.sellerPayout)} accent />
-          <BreakRow label="Myntra commission (40%)" value={inr(price.commission)} />
-        </div>
-      </div>
-
-      <div className="mt-4 flex items-start gap-2 rounded-md bg-accent/40 p-3 text-xs leading-relaxed">
-        <Sparkles className="mt-0.5 h-4 w-4 text-primary animate-pulse" />
-        <div>
-          Price is provisional. If our inspector revises the grade, we recompute and notify the
-          buyer before charging.
-        </div>
-      </div>
-
-      <div className="mt-6 flex justify-between">
-        <button
-          onClick={onBack}
-          className="rounded-md border border-border px-6 py-3 text-sm font-bold uppercase cursor-pointer"
-        >
-          Back
-        </button>
-        <button
-          onClick={onContinue}
-          className="rounded-md bg-primary px-6 py-3 text-sm font-bold uppercase text-primary-foreground cursor-pointer"
-        >
-          Publish listing
-        </button>
-      </div>
-    </section>
-  );
-}
-
 interface VerifyStepProps {
   verifying: boolean;
   verified: boolean;
@@ -939,14 +949,14 @@ function VerifyStep({ verifying, verified, failed, reason, onContinue, onBack }:
     { label: "Duplicate image detection", note: "Prevent stock photo or scraped list" },
     { label: "Confidence scoring", note: "Durable validation audit complete" },
   ];
-  
+
   return (
     <section>
       <h2 className="text-2xl font-black">Auto Product Verification</h2>
       <p className="mt-1 text-sm text-muted-foreground text-pretty">
         Server runs validation algorithms asynchronously on the uploaded original media keys.
       </p>
-      
+
       {verifying && (
         <div className="mt-3 text-xs text-primary font-bold flex items-center gap-1.5 animate-pulse">
           <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -1000,9 +1010,9 @@ function VerifyStep({ verifying, verified, failed, reason, onContinue, onBack }:
           <div>
             <div className="font-bold">Verification rejected by AI guardrails</div>
             <div className="text-xs">
-              Reason code: <span className="font-bold underline">{reason}</span>. 
-              {!reason.includes("perspective") 
-                ? " The photos uploaded were too blurry or low resolution. Hold camera steady and capture in bright lighting." 
+              Reason code: <span className="font-bold underline">{reason}</span>.
+              {!reason.includes("perspective")
+                ? " The photos uploaded were too blurry or low resolution. Hold camera steady and capture in bright lighting."
                 : " The capture perspective did not match the grid overlay layout guidelines."}
             </div>
           </div>
@@ -1054,22 +1064,6 @@ function LiveStep({ onView }: { onView: () => void }) {
         </Link>
       </div>
     </section>
-  );
-}
-
-interface BreakRowProps {
-  label: string;
-  value: string;
-  bold?: boolean;
-  accent?: boolean;
-}
-
-function BreakRow({ label, value, bold, accent }: BreakRowProps) {
-  return (
-    <div className={`flex justify-between px-5 py-3 ${bold ? "bg-muted/50 font-bold" : ""}`}>
-      <span className={accent ? "text-success font-semibold" : ""}>{label}</span>
-      <span className={accent ? "text-success font-bold" : ""}>{value}</span>
-    </div>
   );
 }
 

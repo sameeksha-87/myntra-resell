@@ -37,10 +37,10 @@ export const Route = createFileRoute("/checkout")({
 function CheckoutPage() {
   const { user, loading } = useRequireAuth();
   const navigate = useNavigate();
-  
+
   const [items, setItems] = useState<CheckoutItem[]>([]);
   const [checkoutLoading, setCheckoutLoading] = useState(true);
-  
+
   // Addresses from DB
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
@@ -68,7 +68,8 @@ function CheckoutPage() {
       // 1. Fetch bag items (only live ones)
       const { data: bagData, error: bagError } = await supabase
         .from("bag_items")
-        .select(`
+        .select(
+          `
           id,
           size,
           listings (
@@ -83,7 +84,8 @@ function CheckoutPage() {
               storage_key
             )
           )
-        `)
+        `,
+        )
         .eq("user_id", user.id);
 
       if (bagError) throw bagError;
@@ -102,7 +104,7 @@ function CheckoutPage() {
             id: row.id,
             listing_id: l.id,
             brand: l.brand,
-            title: l.title,
+            title: (l.title || "").split("|||")[0],
             size: row.size || l.size,
             price: Number(l.current_price_paise) / 100,
             image: publicUrl,
@@ -150,7 +152,14 @@ function CheckoutPage() {
 
   const handleAddNewAddress = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAddress.recipient || !newAddress.phone || !newAddress.line1 || !newAddress.city || !newAddress.state || !newAddress.pincode) {
+    if (
+      !newAddress.recipient ||
+      !newAddress.phone ||
+      !newAddress.line1 ||
+      !newAddress.city ||
+      !newAddress.state ||
+      !newAddress.pincode
+    ) {
       toast.error("Please fill in all required address fields");
       return;
     }
@@ -190,7 +199,14 @@ function CheckoutPage() {
     // Determine address
     let activeAddress: AddressInput;
     if (showNewAddressForm) {
-      if (!newAddress.recipient || !newAddress.phone || !newAddress.line1 || !newAddress.city || !newAddress.state || !newAddress.pincode) {
+      if (
+        !newAddress.recipient ||
+        !newAddress.phone ||
+        !newAddress.line1 ||
+        !newAddress.city ||
+        !newAddress.state ||
+        !newAddress.pincode
+      ) {
         toast.error("Please provide a valid delivery address");
         return;
       }
@@ -213,12 +229,12 @@ function CheckoutPage() {
     }
 
     setProcessing(true);
-    
+
     try {
       // Go through checkout items and purchase them (resale is 1-of-1, usually 1 item per checkout)
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
-        
+
         setProcessStep("Reserving exclusive item in listing ledger...");
         await new Promise((resolve) => setTimeout(resolve, 800));
 
@@ -226,12 +242,12 @@ function CheckoutPage() {
         await new Promise((resolve) => setTimeout(resolve, 850));
 
         setProcessStep("Authorizing payment gateways & logs...");
-        
+
         const result = await placeCheckoutOrder({
           data: {
             listingId: item.listing_id,
             address: activeAddress,
-          }
+          },
         });
 
         setProcessStep("Finalizing logisticsWaybills and schedule...");
@@ -240,7 +256,7 @@ function CheckoutPage() {
 
       setProcessStep("Order confirmed!");
       await new Promise((resolve) => setTimeout(resolve, 800));
-      
+
       toast.success("Order placed successfully! Funds are held securely in Escrow.");
       navigate({ to: "/orders" });
     } catch (err: any) {
@@ -259,7 +275,9 @@ function CheckoutPage() {
         <SiteHeader />
         <div className="flex flex-col items-center justify-center py-32 gap-3">
           <Loader2 className="h-8 w-8 text-primary animate-spin" />
-          <p className="text-sm text-muted-foreground font-semibold">Resolving secure checkout cache...</p>
+          <p className="text-sm text-muted-foreground font-semibold">
+            Resolving secure checkout cache...
+          </p>
         </div>
         <SiteFooter />
       </div>
@@ -275,7 +293,9 @@ function CheckoutPage() {
             <Loader2 className="h-8 w-8 animate-spin" />
           </div>
         </div>
-        <h2 className="text-lg font-black uppercase tracking-wider animate-pulse">Processing Order Transaction</h2>
+        <h2 className="text-lg font-black uppercase tracking-wider animate-pulse">
+          Processing Order Transaction
+        </h2>
         <p className="mt-2 text-xs text-zinc-400 font-mono tracking-wide">{processStep}</p>
       </div>
     );
@@ -286,12 +306,17 @@ function CheckoutPage() {
       <SiteHeader />
 
       <div className="mx-auto max-w-5xl px-6 py-8">
-        <Link to="/bag" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground mb-6">
+        <Link
+          to="/bag"
+          className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground mb-6"
+        >
           <ArrowLeft className="h-4 w-4" /> Back to bag
         </Link>
-        
+
         <h1 className="text-2xl font-black uppercase tracking-wide">Checkout</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">Secure Escrow Protection active · Pay after doorstep inspection</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Secure Escrow Protection active · Pay after doorstep inspection
+        </p>
 
         <div className="mt-8 grid gap-8 md:grid-cols-[1.4fr_1fr]">
           <div className="space-y-6">
@@ -308,7 +333,9 @@ function CheckoutPage() {
                       <label
                         key={addr.id}
                         className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer transition ${
-                          selectedAddressId === addr.id ? "border-primary bg-primary/5" : "border-border hover:border-foreground/50"
+                          selectedAddressId === addr.id
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-foreground/50"
                         }`}
                       >
                         <input
@@ -319,13 +346,18 @@ function CheckoutPage() {
                           className="mt-1 accent-primary h-4 w-4"
                         />
                         <div className="text-xs leading-normal">
-                          <div className="font-bold text-foreground">{addr.recipient} · {addr.phone}</div>
-                          <div className="text-muted-foreground mt-1">{addr.line1}, {addr.line2 ? `${addr.line2}, ` : ""}{addr.city}, {addr.state} - {addr.pincode}</div>
+                          <div className="font-bold text-foreground">
+                            {addr.recipient} · {addr.phone}
+                          </div>
+                          <div className="text-muted-foreground mt-1">
+                            {addr.line1}, {addr.line2 ? `${addr.line2}, ` : ""}
+                            {addr.city}, {addr.state} - {addr.pincode}
+                          </div>
                         </div>
                       </label>
                     ))}
                   </div>
-                  
+
                   <button
                     onClick={() => setShowNewAddressForm(true)}
                     className="mt-4 text-xs font-bold text-primary hover:underline cursor-pointer"
@@ -339,7 +371,9 @@ function CheckoutPage() {
                 <form onSubmit={handleAddNewAddress} className="mt-4 space-y-3">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Recipient Name *</label>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Recipient Name *
+                      </label>
                       <input
                         type="text"
                         name="recipient"
@@ -350,7 +384,9 @@ function CheckoutPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Contact Phone *</label>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Contact Phone *
+                      </label>
                       <input
                         type="text"
                         name="phone"
@@ -363,7 +399,9 @@ function CheckoutPage() {
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Flat, House no., Building, Street *</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Flat, House no., Building, Street *
+                    </label>
                     <input
                       type="text"
                       name="line1"
@@ -375,7 +413,9 @@ function CheckoutPage() {
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Area, Colony, Landmark (Optional)</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Area, Colony, Landmark (Optional)
+                    </label>
                     <input
                       type="text"
                       name="line2"
@@ -387,7 +427,9 @@ function CheckoutPage() {
 
                   <div className="grid gap-3 grid-cols-3">
                     <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">City *</label>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        City *
+                      </label>
                       <input
                         type="text"
                         name="city"
@@ -398,7 +440,9 @@ function CheckoutPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">State *</label>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        State *
+                      </label>
                       <input
                         type="text"
                         name="state"
@@ -409,7 +453,9 @@ function CheckoutPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pincode *</label>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Pincode *
+                      </label>
                       <input
                         type="text"
                         name="pincode"
@@ -448,16 +494,12 @@ function CheckoutPage() {
                 <CreditCard className="h-4 w-4 text-primary" /> Payment Method
               </h2>
               <div className="mt-4 p-4 border border-primary/20 bg-primary/5 rounded-md flex items-center gap-3">
-                <input
-                  type="radio"
-                  checked
-                  readOnly
-                  className="accent-primary h-4 w-4"
-                />
+                <input type="radio" checked readOnly className="accent-primary h-4 w-4" />
                 <div className="text-xs">
                   <div className="font-bold text-foreground">Escrow Payment Protection</div>
                   <div className="text-muted-foreground mt-0.5 leading-normal">
-                    Funds will stay in a secure Myntra Escrow account. The seller is paid only after delivery is inspected at your door and the 48-hour dispute window closes.
+                    Funds will stay in a secure Myntra Escrow account. The seller is paid only after
+                    delivery is inspected at your door and the 48-hour dispute window closes.
                   </div>
                 </div>
               </div>
@@ -481,7 +523,9 @@ function CheckoutPage() {
                     <div className="min-w-0 flex-1">
                       <div className="font-bold text-foreground">{item.brand}</div>
                       <div className="text-muted-foreground truncate">{item.title}</div>
-                      <div className="mt-1 text-[10px] text-muted-foreground">Size: {item.size}</div>
+                      <div className="mt-1 text-[10px] text-muted-foreground">
+                        Size: {item.size}
+                      </div>
                     </div>
                     <div className="font-bold">{inr(item.price)}</div>
                   </div>
@@ -501,7 +545,7 @@ function CheckoutPage() {
                 <div className="my-2 h-px bg-border" />
                 <SummaryRow label="Total Payable" value={inr(subtotal)} bold />
               </div>
-              
+
               <button
                 disabled={processing || savedAddresses.length === 0}
                 onClick={handlePlaceOrder}
@@ -513,7 +557,9 @@ function CheckoutPage() {
               <div className="mt-4 flex items-start gap-1.5 text-[10px] text-muted-foreground leading-relaxed">
                 <ShieldCheck className="h-4 w-4 text-success flex-shrink-0" />
                 <div>
-                  By placing this order, you authorize Myntra to hold your funds in Escrow. If the doorstep inspection reveals grade discrepancies, you will be offered the revised terms and are entitled to a full refund if rejected.
+                  By placing this order, you authorize Myntra to hold your funds in Escrow. If the
+                  doorstep inspection reveals grade discrepancies, you will be offered the revised
+                  terms and are entitled to a full refund if rejected.
                 </div>
               </div>
             </div>
@@ -528,7 +574,9 @@ function CheckoutPage() {
 
 function SummaryRow({ label, value, bold, accent }: any) {
   return (
-    <div className={`flex justify-between ${bold ? "font-bold border-t border-border pt-2 text-foreground" : ""}`}>
+    <div
+      className={`flex justify-between ${bold ? "font-bold border-t border-border pt-2 text-foreground" : ""}`}
+    >
       <span className="text-muted-foreground">{label}</span>
       <span className={accent ? "text-success font-semibold" : "text-foreground"}>{value}</span>
     </div>

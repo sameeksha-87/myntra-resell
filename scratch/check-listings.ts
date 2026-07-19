@@ -39,7 +39,8 @@ const supabase = createClient(url, key);
 async function check() {
   const { data, error } = await supabase
     .from("listings")
-    .select(`
+    .select(
+      `
       id,
       title,
       brand,
@@ -62,9 +63,10 @@ async function check() {
         storage_key,
         angle
       )
-    `)
+    `,
+    )
     .limit(1);
-  
+
   if (error) {
     console.error("PostgREST Error Detail:", error);
   } else {

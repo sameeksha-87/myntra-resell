@@ -1,12 +1,30 @@
 // src/routes/listing.$id.tsx
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
-import { Check, PackageCheck, ShieldCheck, Truck, Wallet, Sparkles, AlertTriangle, MessageSquare, Loader2, ArrowLeft, XCircle, RefreshCw } from "lucide-react";
+import {
+  Check,
+  PackageCheck,
+  ShieldCheck,
+  Truck,
+  Wallet,
+  Sparkles,
+  AlertTriangle,
+  MessageSquare,
+  Loader2,
+  ArrowLeft,
+  XCircle,
+  RefreshCw,
+  Sliders,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { inr } from "@/lib/mock-data";
-import { decidePriceRevision, releaseSellerPayout, submitDispute } from "@/integrations/supabase/actions.server";
+import {
+  decidePriceRevision,
+  releaseSellerPayout,
+  submitDispute,
+} from "@/integrations/supabase/actions.server";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/listing/$id")({
@@ -23,7 +41,7 @@ function ListingStatus() {
 
   const [loading, setLoading] = useState(true);
   const [listing, setListing] = useState<any>(null);
-  
+
   // Dispute form state
   const [showDisputeForm, setShowDisputeForm] = useState(false);
   const [disputeReason, setDisputeReason] = useState("");
@@ -37,7 +55,8 @@ function ListingStatus() {
     try {
       const { data, error } = await supabase
         .from("listings")
-        .select(`
+        .select(
+          `
           id,
           title,
           brand,
@@ -85,7 +104,8 @@ function ListingStatus() {
             status,
             tracking_number
           )
-        `)
+        `,
+        )
         .eq("id", id)
         .maybeSingle();
 
@@ -115,7 +135,9 @@ function ListingStatus() {
         <SiteHeader />
         <div className="flex flex-col items-center justify-center py-32 gap-3">
           <Loader2 className="h-8 w-8 text-primary animate-spin" />
-          <p className="text-sm text-muted-foreground font-semibold">Retrieving tracking records...</p>
+          <p className="text-sm text-muted-foreground font-semibold">
+            Retrieving tracking records...
+          </p>
         </div>
         <SiteFooter />
       </div>
@@ -129,8 +151,13 @@ function ListingStatus() {
         <div className="max-w-md mx-auto py-24 text-center px-6">
           <AlertTriangle className="h-10 w-10 text-warning mx-auto mb-3" />
           <h2 className="text-lg font-bold">Listing not found</h2>
-          <p className="text-xs text-muted-foreground mt-1">This listing doesn't exist or you don't have access to track it.</p>
-          <Link to="/orders" className="mt-4 inline-block text-xs font-bold text-primary uppercase tracking-wider hover:underline">
+          <p className="text-xs text-muted-foreground mt-1">
+            This listing doesn't exist or you don't have access to track it.
+          </p>
+          <Link
+            to="/orders"
+            className="mt-4 inline-block text-xs font-bold text-primary uppercase tracking-wider hover:underline"
+          >
             Back to account orders
           </Link>
         </div>
@@ -150,15 +177,21 @@ function ListingStatus() {
     { key: "verifying", label: "Verification", icon: ShieldCheck, note: "AI checks complete" },
     { key: "live", label: "Marketplace Live", icon: Sparkles, note: "Visible to buyers" },
     { key: "sold", label: "Item Sold", icon: Wallet, note: "Buyer escrow authorized" },
-    { key: "inspection", label: "Inspection / Shipping", icon: PackageCheck, note: "Doorstep grade verification" },
-    { key: "paid", label: "Payout Settled", icon: Check, note: "Transaction closed" }
+    {
+      key: "inspection",
+      label: "Inspection / Shipping",
+      icon: PackageCheck,
+      note: "Doorstep grade verification",
+    },
+    { key: "paid", label: "Payout Settled", icon: Check, note: "Transaction closed" },
   ];
 
   // Map low level DB status to current active high-level index
   let activeIndex = 0;
   if (["live", "reserved"].includes(currentStatus)) activeIndex = 1;
   else if (currentStatus === "sold") activeIndex = 2;
-  else if (["in_transit", "buyer_approval_pending", "disputed"].includes(currentStatus)) activeIndex = 3;
+  else if (["in_transit", "buyer_approval_pending", "disputed"].includes(currentStatus))
+    activeIndex = 3;
   else if (["delivered", "completed", "paid"].includes(currentStatus)) activeIndex = 4;
 
   const handlePriceApproval = async (approved: boolean) => {
@@ -169,7 +202,7 @@ function ListingStatus() {
         data: {
           orderId: order.id,
           approved,
-        }
+        },
       });
 
       if (result.success) {
@@ -190,7 +223,7 @@ function ListingStatus() {
       const result = await releaseSellerPayout({
         data: {
           orderId: order.id,
-        }
+        },
       });
       if (result.success) {
         toast.success("Payout successfully released to your Myntra Credits!");
@@ -212,7 +245,7 @@ function ListingStatus() {
         data: {
           orderId: order.id,
           reason: disputeReason,
-        }
+        },
       });
       toast.success("Dispute raised. Operations team has been notified.");
       setShowDisputeForm(false);
@@ -240,14 +273,17 @@ function ListingStatus() {
               <ArrowLeft className="h-3 w-3" /> Account
             </Link>
             <span>·</span>
-            <span>{listing.brand} · {listing.title}</span>
+            <span>
+              {listing.brand} · {(listing.title || "").split("|||")[0]}
+            </span>
           </div>
-          
+
           <h1 className="mt-2 text-2xl font-black md:text-3xl leading-tight">
             {isSeller ? "Seller Console · Listing Status" : "Buyer Console · Order Tracking"}
           </h1>
           <p className="mt-1 text-xs text-white/85">
-            Listing Price: {inr(listing.current_price_paise / 100)} · Confirmed Grade: {listing.confirmed_grade || listing.declared_grade}
+            Listing Price: {inr(listing.current_price_paise / 100)} · Confirmed Grade:{" "}
+            {listing.confirmed_grade || listing.declared_grade}
           </p>
         </div>
       </section>
@@ -259,22 +295,34 @@ function ListingStatus() {
           {isBuyer && currentStatus === "buyer_approval_pending" && pendingApproval && (
             <div className="rounded-md border border-warning/30 bg-warning/5 p-5 shadow-card leading-relaxed">
               <div className="flex items-center gap-2 text-sm font-bold text-warning-foreground uppercase tracking-wide">
-                <AlertTriangle className="h-5 w-5 text-warning animate-bounce" /> Action Required: Doorstep Inspection Grade Revised
+                <AlertTriangle className="h-5 w-5 text-warning animate-bounce" /> Action Required:
+                Doorstep Inspection Grade Revised
               </div>
               <p className="mt-2 text-xs text-muted-foreground text-pretty">
-                During doorstep pickup, the inspector revised the grade of the item from <span className="font-bold">{pendingApproval.old_terms.grade}</span> to <span className="font-bold text-primary">{pendingApproval.new_terms.grade}</span>. The price has been updated transparently:
+                During doorstep pickup, the inspector revised the grade of the item from{" "}
+                <span className="font-bold">{pendingApproval.old_terms.grade}</span> to{" "}
+                <span className="font-bold text-primary">{pendingApproval.new_terms.grade}</span>.
+                The price has been updated transparently:
               </p>
-              
+
               <div className="mt-4 grid grid-cols-2 gap-4 border border-border/50 bg-card p-3 rounded-md text-xs">
                 <div>
                   <div className="text-muted-foreground font-semibold">Original Bid</div>
-                  <div className="text-lg font-black text-zinc-500 line-through">{inr(pendingApproval.old_terms.price / 100)}</div>
-                  <div className="text-[10px] text-muted-foreground mt-0.5">Grade: {pendingApproval.old_terms.grade}</div>
+                  <div className="text-lg font-black text-zinc-500 line-through">
+                    {inr(pendingApproval.old_terms.price / 100)}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">
+                    Grade: {pendingApproval.old_terms.grade}
+                  </div>
                 </div>
                 <div>
                   <div className="text-primary font-bold">Revised Offer</div>
-                  <div className="text-lg font-black text-success">{inr(pendingApproval.new_terms.price / 100)}</div>
-                  <div className="text-[10px] text-success font-semibold mt-0.5">Grade: {pendingApproval.new_terms.grade}</div>
+                  <div className="text-lg font-black text-success">
+                    {inr(pendingApproval.new_terms.price / 100)}
+                  </div>
+                  <div className="text-[10px] text-success font-semibold mt-0.5">
+                    Grade: {pendingApproval.new_terms.grade}
+                  </div>
                 </div>
               </div>
 
@@ -302,9 +350,14 @@ function ListingStatus() {
             <div className="rounded-md border border-warning/20 bg-warning/5 p-4 text-xs leading-relaxed flex items-start gap-2">
               <RefreshCw className="h-5 w-5 text-warning animate-spin flex-shrink-0" />
               <div>
-                <div className="font-bold text-warning-foreground uppercase tracking-wide">Inspection Grade Mismatch · Awaiting Buyer Approval</div>
+                <div className="font-bold text-warning-foreground uppercase tracking-wide">
+                  Inspection Grade Mismatch · Awaiting Buyer Approval
+                </div>
                 <p className="text-muted-foreground mt-1">
-                  The inspector confirmed a grade of <span className="font-bold">{listing.confirmed_grade}</span> instead of your declared <span className="font-bold">{listing.declared_grade}</span>. The pricing has been re-quoted and the buyer is reviewing the terms.
+                  The inspector confirmed a grade of{" "}
+                  <span className="font-bold">{listing.confirmed_grade}</span> instead of your
+                  declared <span className="font-bold">{listing.declared_grade}</span>. The pricing
+                  has been re-quoted and the buyer is reviewing the terms.
                 </p>
               </div>
             </div>
@@ -314,13 +367,16 @@ function ListingStatus() {
           {currentStatus === "disputed" && dispute && (
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-5 shadow-card leading-relaxed">
               <div className="flex items-center gap-2 text-sm font-bold text-destructive uppercase tracking-wide">
-                <AlertTriangle className="h-5 w-5 text-destructive animate-pulse" /> Active Dispute Under Operations Review
+                <AlertTriangle className="h-5 w-5 text-destructive animate-pulse" /> Active Dispute
+                Under Operations Review
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
                 <b>Complainant Reason:</b> "{dispute.reason}"
               </p>
               <div className="mt-3 bg-card border border-border/50 p-3 rounded text-[11px] text-muted-foreground">
-                Our operations console is auditing the photo submissions, inspection logs, and ledger allocations. A resolution will be applied within 24 hours. Payout is currently locked in Escrow.
+                Our operations console is auditing the photo submissions, inspection logs, and
+                ledger allocations. A resolution will be applied within 24 hours. Payout is
+                currently locked in Escrow.
               </div>
             </div>
           )}
@@ -330,9 +386,12 @@ function ListingStatus() {
             <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4 text-xs leading-relaxed flex items-start gap-2">
               <XCircle className="h-5 w-5 text-zinc-500 flex-shrink-0" />
               <div>
-                <div className="font-bold text-zinc-800 uppercase tracking-wide">Order Refunded & Dispute Closed</div>
+                <div className="font-bold text-zinc-800 uppercase tracking-wide">
+                  Order Refunded & Dispute Closed
+                </div>
                 <p className="text-muted-foreground mt-1">
-                  The dispute has been resolved in favor of the buyer. The escrow hold has been fully released back to the buyer's account.
+                  The dispute has been resolved in favor of the buyer. The escrow hold has been
+                  fully released back to the buyer's account.
                 </p>
               </div>
             </div>
@@ -340,13 +399,15 @@ function ListingStatus() {
 
           {/* Timeline Tracker */}
           <div className="rounded-md border border-border bg-card p-5 shadow-card">
-            <h2 className="text-base font-black uppercase tracking-wide mb-4">Milestone Progress</h2>
+            <h2 className="text-base font-black uppercase tracking-wide mb-4">
+              Milestone Progress
+            </h2>
             <ol className="relative border-l border-border pl-6 space-y-6">
               {stages.map((stage, idx) => {
                 const done = idx < activeIndex;
                 const active = idx === activeIndex;
                 const Icon = stage.icon;
-                
+
                 return (
                   <li key={stage.key} className="relative">
                     <span
@@ -360,9 +421,11 @@ function ListingStatus() {
                     >
                       {done ? <Check className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
                     </span>
-                    
+
                     <div className="text-xs">
-                      <div className={`font-bold ${active ? "text-primary text-sm" : "text-foreground"}`}>
+                      <div
+                        className={`font-bold ${active ? "text-primary text-sm" : "text-foreground"}`}
+                      >
                         {stage.label}
                       </div>
                       <div className="text-[11px] text-muted-foreground mt-0.5">{stage.note}</div>
@@ -379,9 +442,11 @@ function ListingStatus() {
               <h2 className="text-base font-black uppercase tracking-wide mb-4 flex items-center gap-1.5">
                 <Truck className="h-5 w-5 text-primary" /> Shipment Tracking logs
               </h2>
-              
+
               {trackingEvents.length === 0 ? (
-                <div className="text-xs text-muted-foreground py-4 text-center">No shipping updates yet. Scheduled pickup is active.</div>
+                <div className="text-xs text-muted-foreground py-4 text-center">
+                  No shipping updates yet. Scheduled pickup is active.
+                </div>
               ) : (
                 <div className="space-y-4">
                   {trackingEvents.map((evt: any, i: number) => {
@@ -393,15 +458,20 @@ function ListingStatus() {
                       month: "short",
                       day: "numeric",
                     });
-                    
+
                     return (
-                      <div key={i} className="flex gap-3 text-xs leading-normal border-b border-border/30 pb-3 last:border-0 last:pb-0">
+                      <div
+                        key={i}
+                        className="flex gap-3 text-xs leading-normal border-b border-border/30 pb-3 last:border-0 last:pb-0"
+                      >
                         <div className="text-right text-muted-foreground w-16 flex-shrink-0">
                           <div className="font-bold">{time}</div>
                           <div className="text-[10px]">{date}</div>
                         </div>
                         <div className="flex-1">
-                          <div className="font-bold text-foreground uppercase text-[10px] tracking-wide">{evt.status.replace("_", " ")}</div>
+                          <div className="font-bold text-foreground uppercase text-[10px] tracking-wide">
+                            {evt.status.replace("_", " ")}
+                          </div>
                           <div className="text-muted-foreground mt-0.5">{evt.description}</div>
                         </div>
                       </div>
@@ -421,12 +491,20 @@ function ListingStatus() {
               {isSeller ? "Seller Payout Payout" : "Escrow Payment Holding"}
             </div>
             <div className="mt-1 text-2xl font-black">
-              {inr(isSeller ? (order ? order.payout_paise / 100 : (listing.current_price_paise * 0.60) / 100) : (order ? order.final_price_paise / 100 : listing.current_price_paise / 100))}
+              {inr(
+                isSeller
+                  ? order
+                    ? order.payout_paise / 100
+                    : (listing.current_price_paise * 0.6) / 100
+                  : order
+                    ? order.final_price_paise / 100
+                    : listing.current_price_paise / 100,
+              )}
             </div>
-            
+
             <div className="text-xs text-muted-foreground mt-1">
-              {isSeller 
-                ? `60% of listing price ${inr(order ? order.final_price_paise / 100 : listing.current_price_paise / 100)}` 
+              {isSeller
+                ? `60% of listing price ${inr(order ? order.final_price_paise / 100 : listing.current_price_paise / 100)}`
                 : `Escrow hold ID: escrow_${id.slice(0, 6)}`}
             </div>
 
@@ -437,7 +515,12 @@ function ListingStatus() {
                 onClick={handleClaimPayout}
                 className="mt-4 w-full py-2.5 bg-primary text-white text-xs font-bold uppercase tracking-wider rounded cursor-pointer hover:bg-primary/95 shadow transition flex items-center justify-center gap-1"
               >
-                {actionBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wallet className="h-3.5 w-3.5" />} Claim Payout Credits
+                {actionBusy ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Wallet className="h-3.5 w-3.5" />
+                )}{" "}
+                Claim Payout Credits
               </button>
             )}
 
@@ -448,14 +531,38 @@ function ListingStatus() {
             )}
           </div>
 
+          {(() => {
+            const [, conditionDesc] = (listing.title || "").split("|||");
+            if (!conditionDesc) return null;
+            return (
+              <div className="rounded-md border border-border bg-card p-4 shadow-card text-xs leading-normal">
+                <div className="font-bold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
+                  <Sliders className="h-3.5 w-3.5 text-primary" /> Declared Details
+                </div>
+                <p className="text-muted-foreground italic">"{conditionDesc}"</p>
+              </div>
+            );
+          })()}
+
           {/* Pickup job info */}
           {isSeller && listing.pickup_jobs && (
             <div className="rounded-md border border-border bg-card p-4 shadow-card text-xs leading-normal">
-              <div className="font-bold text-muted-foreground uppercase tracking-wide mb-2">Pickup Job Information</div>
+              <div className="font-bold text-muted-foreground uppercase tracking-wide mb-2">
+                Pickup Job Information
+              </div>
               <div className="space-y-1 text-muted-foreground">
-                <div><b>Slot:</b> {listing.pickup_jobs.scheduled_slot}</div>
-                <div><b>Partner Code:</b> {listing.pickup_jobs.tracking_number}</div>
-                <div><b>Status:</b> <span className="capitalize font-bold text-primary">{listing.pickup_jobs.status}</span></div>
+                <div>
+                  <b>Slot:</b> {listing.pickup_jobs.scheduled_slot}
+                </div>
+                <div>
+                  <b>Partner Code:</b> {listing.pickup_jobs.tracking_number}
+                </div>
+                <div>
+                  <b>Status:</b>{" "}
+                  <span className="capitalize font-bold text-primary">
+                    {listing.pickup_jobs.status}
+                  </span>
+                </div>
               </div>
             </div>
           )}
@@ -463,11 +570,14 @@ function ListingStatus() {
           {/* Buyer protection dispute box */}
           {isBuyer && currentStatus === "delivered" && !dispute && (
             <div className="rounded-md border border-border bg-card p-4 shadow-card text-xs">
-              <h3 className="font-bold flex items-center gap-1.5 text-foreground uppercase tracking-wider"><ShieldCheck className="h-4 w-4 text-success" /> 48h Buyer Protection Active</h3>
+              <h3 className="font-bold flex items-center gap-1.5 text-foreground uppercase tracking-wider">
+                <ShieldCheck className="h-4 w-4 text-success" /> 48h Buyer Protection Active
+              </h3>
               <p className="mt-1.5 text-muted-foreground text-pretty">
-                If the item size, details, or condition does not match what was inspected, you can open a dispute.
+                If the item size, details, or condition does not match what was inspected, you can
+                open a dispute.
               </p>
-              
+
               {!showDisputeForm ? (
                 <button
                   onClick={() => setShowDisputeForm(true)}

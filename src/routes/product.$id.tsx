@@ -14,6 +14,7 @@ import {
   RotateCcw,
   Loader2,
   Trash2,
+  Sliders,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -62,7 +63,7 @@ function ProductPage() {
   const fetchProduct = async () => {
     setLoading(true);
     const isUuid = /^[0-9a-f-]{36}$/i.test(id);
-    
+
     if (!isUuid) {
       // Legacy mock products fallback
       const mockP = products.find((p) => p.id === id);
@@ -80,7 +81,8 @@ function ProductPage() {
       // Query normalized listing joined with profile, order specs and media
       const { data: rawData, error } = await supabase
         .from("listings")
-        .select(`
+        .select(
+          `
           id,
           title,
           brand,
@@ -103,7 +105,8 @@ function ProductPage() {
             storage_key,
             angle
           )
-        `)
+        `,
+        )
         .eq("id", id)
         .single();
 
@@ -116,13 +119,14 @@ function ProductPage() {
         .maybeSingle();
 
       const data = rawData as any;
-      const orderItem = data.myntra_order_items as any || {};
-      const order = orderItem.myntra_orders as any || {};
+      const orderItem = (data.myntra_order_items as any) || {};
+      const order = (orderItem.myntra_orders as any) || {};
       const media = data.listing_media || [];
 
       // Format photo gallery from storage keys
       const gallery = media.map(
-        (m: any) => `${(supabase as any).supabaseUrl}/storage/v1/object/public/resell-photos/${m.storage_key}`
+        (m: any) =>
+          `${(supabase as any).supabaseUrl}/storage/v1/object/public/resell-photos/${m.storage_key}`,
       );
       if (gallery.length === 0) {
         // Fallback demo image if storage bucket fails
@@ -130,13 +134,18 @@ function ProductPage() {
       }
 
       const purchaseDate = order.delivered_at ? new Date(order.delivered_at) : new Date();
-      const ageYears = Math.max(0.1, (new Date().getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
-      const originalPrice = orderItem.original_price_paise ? Number(orderItem.original_price_paise) / 100 : 9999;
-      
+      const ageYears = Math.max(
+        0.1,
+        (new Date().getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25),
+      );
+      const originalPrice = orderItem.original_price_paise
+        ? Number(orderItem.original_price_paise) / 100
+        : 9999;
+
       const grade = data.confirmed_grade || data.declared_grade;
-      const gradeFactors = { Pristine: 1.0, Excellent: 0.85, Good: 0.70 };
+      const gradeFactors = { Pristine: 1.0, Excellent: 0.85, Good: 0.7 };
       const factor = gradeFactors[grade as Grade] || 0.85;
-      const depreciation = Math.max(0.2, 1.0 - 0.20 * ageYears);
+      const depreciation = Math.max(0.2, 1.0 - 0.2 * ageYears);
 
       setProduct({
         id: data.id,
@@ -162,7 +171,7 @@ function ProductPage() {
           commission: Math.round((Number(data.current_price_paise) / 100) * 0.4),
           depreciation,
           factor,
-        }
+        },
       });
 
       // Fetch verification checks
@@ -197,7 +206,7 @@ function ProductPage() {
       setWished(false);
       return;
     }
-    
+
     // Check wishlist state in DB
     const isUuid = /^[0-9a-f-]{36}$/i.test(product.id);
     if (!isUuid) return;
@@ -231,10 +240,10 @@ function ProductPage() {
 
     // Create the listing in DB
     const originalPricePaise = mockProduct.originalPrice * 100;
-    const gradeFactors = { Pristine: 1.0, Excellent: 0.85, Good: 0.70 };
+    const gradeFactors = { Pristine: 1.0, Excellent: 0.85, Good: 0.7 };
     const grade = mockProduct.confirmedGrade || mockProduct.declaredGrade;
     const factor = gradeFactors[grade as Grade] || 0.85;
-    const depreciation = Math.max(0.2, 1 - 0.20 * mockProduct.ageYears);
+    const depreciation = Math.max(0.2, 1 - 0.2 * mockProduct.ageYears);
     const currentPricePaise = Math.max(0, Math.round(originalPricePaise * depreciation * factor));
 
     const { error } = await supabase.from("listings").insert({
@@ -353,7 +362,9 @@ function ProductPage() {
         <SiteHeader />
         <div className="flex flex-col items-center justify-center py-32 gap-3">
           <Loader2 className="h-8 w-8 text-primary animate-spin" />
-          <p className="text-sm text-muted-foreground font-semibold">Validating listing ledger...</p>
+          <p className="text-sm text-muted-foreground font-semibold">
+            Validating listing ledger...
+          </p>
         </div>
         <SiteFooter />
       </div>
@@ -362,7 +373,7 @@ function ProductPage() {
 
   const grade = product.confirmedGrade || product.declaredGrade;
   const isSeller = user && product && product.seller_id === user.id;
-  
+
   // Custom price formulas
   const priceFormula = product.priceFormula || {
     listPrice: product.originalPrice,
@@ -391,7 +402,11 @@ function ProductPage() {
             ))}
           </div>
           <div className="relative aspect-[4/5] overflow-hidden rounded-md bg-muted border border-border">
-            <img src={product.gallery[activeImageIndex]} alt={product.title} className="h-full w-full object-cover" />
+            <img
+              src={product.gallery[activeImageIndex]}
+              alt={product.title}
+              className="h-full w-full object-cover"
+            />
             <div className="absolute left-3 top-3 flex flex-col gap-2">
               <TrustBadge kind="verified" size="md" />
               <TrustBadge kind={product.inspected ? "inspected" : "inspection-pending"} size="md" />
@@ -408,16 +423,23 @@ function ProductPage() {
 
         {/* Product specs */}
         <div>
-          <div className="text-2xl font-black text-foreground">{product.brand}</div>
-          <div className="text-lg text-muted-foreground">{product.title}</div>
-          
+          {(() => {
+            const [titleOnly] = (product.title || "").split("|||");
+            return (
+              <>
+                <div className="text-2xl font-black text-foreground">{product.brand}</div>
+                <div className="text-lg text-muted-foreground">{titleOnly}</div>
+              </>
+            );
+          })()}
+
           <div className="mt-2 flex items-center gap-2">
             <span className="inline-flex items-center gap-1 rounded-sm bg-success/10 px-1.5 py-0.5 text-xs font-bold text-success">
               {product.sellerScore.toFixed(1)} <Star className="h-3 w-3 fill-success" />
             </span>
             <span className="text-xs text-muted-foreground">Listed by {product.seller}</span>
           </div>
-          
+
           <div className="mt-4 h-px w-full bg-border" />
 
           <div className="mt-4 flex items-baseline gap-2">
@@ -478,7 +500,11 @@ function ProductPage() {
                   disabled={busy === "bag" || product.status !== "live"}
                   className="flex-1 rounded-md bg-primary py-3.5 text-sm font-bold uppercase tracking-wide text-primary-foreground hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
                 >
-                  {busy === "bag" ? "Adding…" : product.status !== "live" ? "Unavailable" : "Add to Bag"}
+                  {busy === "bag"
+                    ? "Adding…"
+                    : product.status !== "live"
+                      ? "Unavailable"
+                      : "Add to Bag"}
                 </button>
                 <button
                   onClick={toggleWishlist}
@@ -502,6 +528,19 @@ function ProductPage() {
             </button>
           </div>
 
+          {(() => {
+            const [, conditionDesc] = (product.title || "").split("|||");
+            if (!conditionDesc) return null;
+            return (
+              <div className="mt-6 rounded-md border border-border bg-card p-4 shadow-card leading-relaxed">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5 border-b border-border pb-2">
+                  <Sliders className="h-4 w-4 text-primary" /> Details
+                </h3>
+                <p className="text-sm text-foreground italic">"{conditionDesc}"</p>
+              </div>
+            );
+          })()}
+
           {/* Trust validation panel */}
           <div className="mt-6 rounded-md border border-border bg-card p-4">
             <div className="text-xs font-bold uppercase tracking-wider">
@@ -514,15 +553,25 @@ function ProductPage() {
                 note="Matched against original Myntra purchase record, quality gate cleared, no duplicate/stock photos detected."
                 color="text-verified"
               />
-              
+
               {/* Dynamic AI Checks list if available */}
               {verifChecks.length > 0 && (
                 <div className="pl-6 grid grid-cols-2 gap-2 text-[10px] text-muted-foreground bg-muted/30 p-2 rounded">
                   {verifChecks.map((check) => (
-                    <div key={check.check_type} className="flex justify-between border-b border-border/30 pb-0.5">
+                    <div
+                      key={check.check_type}
+                      className="flex justify-between border-b border-border/30 pb-0.5"
+                    >
                       <span className="capitalize">{check.check_type.replace("_", " ")}:</span>
-                      <span className={check.status === "passed" ? "text-success font-bold" : "text-destructive font-bold"}>
-                        {check.status === "passed" ? "Pass" : "Fail"} ({(check.score || 0).toFixed(1)})
+                      <span
+                        className={
+                          check.status === "passed"
+                            ? "text-success font-bold"
+                            : "text-destructive font-bold"
+                        }
+                      >
+                        {check.status === "passed" ? "Pass" : "Fail"} (
+                        {(check.score || 0).toFixed(1)})
                       </span>
                     </div>
                   ))}
@@ -543,7 +592,7 @@ function ProductPage() {
                 }
                 color="text-success"
               />
-              
+
               {product.confirmedGrade && product.confirmedGrade !== product.declaredGrade && (
                 <TrustRow
                   icon={Recycle}
@@ -579,14 +628,19 @@ function ProductPage() {
 
           {/* Price transparency breakdown */}
           <details className="mt-4 rounded-md border border-border p-4 text-sm">
-            <summary className="cursor-pointer font-bold select-none">How this price was computed</summary>
+            <summary className="cursor-pointer font-bold select-none">
+              How this price was computed
+            </summary>
             <div className="mt-3 space-y-1 text-xs">
               <Row label="Original Myntra price" value={inr(product.originalPrice)} />
               <Row
                 label={`Depreciation · ${priceFormula.depreciation.toFixed(2)} factor`}
                 value={`× ${priceFormula.depreciation.toFixed(2)}`}
               />
-              <Row label={`Grade factor · ${grade}`} value={`× ${priceFormula.factor.toFixed(2)}`} />
+              <Row
+                label={`Grade factor · ${grade}`}
+                value={`× ${priceFormula.factor.toFixed(2)}`}
+              />
               <div className="my-2 border-t border-border" />
               <Row label="Final listing price" value={inr(priceFormula.listPrice)} bold />
               <Row label="Seller receives (60%)" value={inr(priceFormula.sellerPayout)} />
@@ -615,7 +669,9 @@ function TrustRow({ icon: Icon, title, note, color }: any) {
 
 function Row({ label, value, bold }: any) {
   return (
-    <div className={`flex justify-between py-1 ${bold ? "font-bold border-t border-border pt-2" : ""}`}>
+    <div
+      className={`flex justify-between py-1 ${bold ? "font-bold border-t border-border pt-2" : ""}`}
+    >
       <span className="text-muted-foreground">{label}</span>
       <span className="font-semibold text-foreground">{value}</span>
     </div>

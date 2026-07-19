@@ -38,7 +38,8 @@ function BagPage() {
     try {
       const { data, error } = await supabase
         .from("bag_items")
-        .select(`
+        .select(
+          `
           id,
           size,
           quantity,
@@ -57,7 +58,8 @@ function BagPage() {
               angle
             )
           )
-        `)
+        `,
+        )
         .eq("user_id", user.id);
 
       if (error) throw error;
@@ -65,7 +67,8 @@ function BagPage() {
       const formatted: BagRow[] = (data ?? []).map((row: any) => {
         const l = row.listings || {};
         const media = l.listing_media || [];
-        const imagePath = media.find((m: any) => m.angle === "top")?.storage_key || media[0]?.storage_key || "";
+        const imagePath =
+          media.find((m: any) => m.angle === "top")?.storage_key || media[0]?.storage_key || "";
         const publicUrl = imagePath
           ? `${(supabase as any).supabaseUrl}/storage/v1/object/public/resell-photos/${imagePath}`
           : "https://picsum.photos/seed/resell-default/600/750";
@@ -76,7 +79,7 @@ function BagPage() {
           id: row.id,
           listing_id: l.id,
           brand: l.brand || "Brand",
-          title: l.title || "Pre-loved Fashion",
+          title: (l.title || "Pre-loved Fashion").split("|||")[0],
           size: row.size || l.size || "M",
           quantity: row.quantity,
           price: price,
@@ -114,7 +117,9 @@ function BagPage() {
   if (loading || !user) {
     return (
       <Frame>
-        <div className="p-20 text-center text-sm text-muted-foreground font-semibold">Validating session security...</div>
+        <div className="p-20 text-center text-sm text-muted-foreground font-semibold">
+          Validating session security...
+        </div>
       </Frame>
     );
   }
@@ -129,13 +134,16 @@ function BagPage() {
           </p>
 
           {busy ? (
-            <div className="mt-16 text-center text-sm text-muted-foreground animate-pulse">Checking item ledger status...</div>
+            <div className="mt-16 text-center text-sm text-muted-foreground animate-pulse">
+              Checking item ledger status...
+            </div>
           ) : items.length === 0 ? (
             <div className="mt-8 rounded-md border border-dashed border-border p-16 text-center bg-card shadow-sm">
               <ShoppingBag className="mx-auto h-10 w-10 text-muted-foreground" />
               <div className="mt-3 text-lg font-bold">Your bag is empty</div>
               <p className="mt-1 text-sm text-muted-foreground text-pretty max-w-sm mx-auto">
-                Browse the marketplace for authenticated pre-loved Myntra products. Zero risk doorstep protection active.
+                Browse the marketplace for authenticated pre-loved Myntra products. Zero risk
+                doorstep protection active.
               </p>
               <Link
                 to="/"
@@ -150,7 +158,8 @@ function BagPage() {
                 <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3.5 text-xs text-destructive leading-relaxed flex items-start gap-2">
                   <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                   <div>
-                    Some items in your bag are no longer available (sold or withdrawn). Please remove them to proceed to checkout.
+                    Some items in your bag are no longer available (sold or withdrawn). Please
+                    remove them to proceed to checkout.
                   </div>
                 </div>
               )}
@@ -158,7 +167,9 @@ function BagPage() {
                 <div
                   key={row.id}
                   className={`flex gap-4 rounded-md border p-4 shadow-card transition bg-card ${
-                    row.isAvailable ? "border-border" : "border-destructive/20 bg-destructive/5 opacity-80"
+                    row.isAvailable
+                      ? "border-border"
+                      : "border-destructive/20 bg-destructive/5 opacity-80"
                   }`}
                 >
                   <Link to="/product/$id" params={{ id: row.listing_id }} className="flex-shrink-0">
@@ -172,10 +183,14 @@ function BagPage() {
                     <div className="text-sm font-bold text-foreground">{row.brand}</div>
                     <div className="truncate text-sm text-muted-foreground">{row.title}</div>
                     <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
-                      <span>Size: <b>{row.size}</b></span>
-                      <span>Qty: <b>{row.quantity}</b></span>
+                      <span>
+                        Size: <b>{row.size}</b>
+                      </span>
+                      <span>
+                        Qty: <b>{row.quantity}</b>
+                      </span>
                     </div>
-                    
+
                     <div className="mt-2 flex items-baseline gap-2">
                       <span className="text-base font-black">{inr(row.price)}</span>
                       {!row.isAvailable && (
@@ -203,16 +218,13 @@ function BagPage() {
             Price Details
           </div>
           <div className="mt-3 space-y-2 text-sm">
-            <Row
-              label={`Subtotal (${availableItems.length} available)`}
-              value={inr(subtotal)}
-            />
+            <Row label={`Subtotal (${availableItems.length} available)`} value={inr(subtotal)} />
             <Row label="Buyer protection fee" value="FREE" accent />
             <Row label="Delivery promise" value="FREE" accent />
             <div className="my-2 h-px bg-border" />
             <Row label="Total payable" value={inr(subtotal)} bold />
           </div>
-          
+
           <button
             disabled={availableItems.length === 0 || hasUnavailable}
             onClick={() => navigate({ to: "/checkout" })}
@@ -220,7 +232,7 @@ function BagPage() {
           >
             Proceed to Checkout
           </button>
-          
+
           <div className="mt-4 space-y-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-verified" /> Escrow-protected · pay after
@@ -248,7 +260,9 @@ function Frame({ children }: { children: React.ReactNode }) {
 
 function Row({ label, value, bold, accent }: any) {
   return (
-    <div className={`flex justify-between ${bold ? "font-bold border-t border-border pt-2 text-foreground" : ""}`}>
+    <div
+      className={`flex justify-between ${bold ? "font-bold border-t border-border pt-2 text-foreground" : ""}`}
+    >
       <span className="text-muted-foreground">{label}</span>
       <span className={accent ? "text-success font-semibold" : "text-foreground"}>{value}</span>
     </div>

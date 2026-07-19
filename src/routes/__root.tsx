@@ -200,7 +200,7 @@ function RoleSwitcher() {
       <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-primary">
         <Sliders className="h-3.5 w-3.5 animate-pulse text-primary" /> ReSell Hackathon Simulator
       </div>
-      
+
       <div className="flex flex-wrap items-center gap-4">
         {user ? (
           <span className="text-[10px] text-zinc-400">
@@ -232,7 +232,7 @@ function RoleSwitcher() {
             <button
               onClick={() => handleRoleChange("guest")}
               className={`px-2.5 py-1 text-[10px] uppercase font-bold transition-all cursor-pointer ${
-                (!user || role === "guest")
+                !user || role === "guest"
                   ? "bg-zinc-700 text-zinc-200 font-black"
                   : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-750"
               }`}
@@ -267,4 +267,3 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
-

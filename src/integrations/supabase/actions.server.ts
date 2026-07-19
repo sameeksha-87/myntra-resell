@@ -43,11 +43,13 @@ export const createListingDraft = createServerFn({ method: "POST" })
     z.object({
       orderItemId: z.string().uuid(),
       declaredGrade: z.enum(["Pristine", "Excellent", "Good"]),
+      customPrice: z.number().optional().nullable(),
+      conditionDetails: z.string().optional().nullable(),
     }),
   )
   .handler(async ({ context, data }) => {
     const { userId } = context;
-    const { orderItemId, declaredGrade } = data;
+    const { orderItemId, declaredGrade, customPrice, conditionDetails } = data;
 
     // Check if the order item belongs to this user and is eligible
     const { data: item, error: itemError } = await supabaseAdmin
@@ -130,18 +132,29 @@ export const createListingDraft = createServerFn({ method: "POST" })
 
     const originalPricePaise = Number(item.original_price_paise);
     const depreciationFactor = Math.max(0.2, 1.0 - depreciationRate * ageYears);
-    const listingPricePaise = Math.max(
+
+    // Calculate estimated AI price
+    const aiPricePaise = Math.max(
       0,
       Math.round(originalPricePaise * depreciationFactor * gradeFactor),
     );
+
+    // Set final listing price to custom price if supplied, else use AI estimated price
+    const listingPricePaise =
+      customPrice !== undefined && customPrice !== null
+        ? Math.round(customPrice * 100)
+        : aiPricePaise;
+
     const sellerPayoutPaise = Math.round(listingPricePaise * (1 - pricingRules.commission_rate));
     const commissionPaise = listingPricePaise - sellerPayoutPaise;
+
+    const displayTitle = conditionDetails ? `${item.title}|||${conditionDetails}` : item.title;
 
     // Create draft listing (or update if previously failed/withdrawn)
     const listingData = {
       seller_id: userId,
       source_order_item_id: orderItemId,
-      title: item.title,
+      title: displayTitle,
       brand: "Zara", // Fallback, would fetch brand name normally
       category: "Outerwear", // Fallback
       size: item.size,
@@ -1361,7 +1374,7 @@ export const fetchListings = createServerFn({ method: "GET" })
       const order = orderItem.myntra_orders || {};
       const originalPrice = orderItem.original_price_paise
         ? Number(orderItem.original_price_paise) / 100
-        : (Number(l.current_price_paise) / 100) / 0.7;
+        : Number(l.current_price_paise) / 100 / 0.7;
 
       const purchaseDate = order.delivered_at ? new Date(order.delivered_at) : new Date();
       const ageYears = Math.max(
@@ -1370,7 +1383,8 @@ export const fetchListings = createServerFn({ method: "GET" })
       );
 
       const gallery = media.map(
-        (m: any) => `${process.env.SUPABASE_URL}/storage/v1/object/public/resell-photos/${m.storage_key}`,
+        (m: any) =>
+          `${process.env.SUPABASE_URL}/storage/v1/object/public/resell-photos/${m.storage_key}`,
       );
       if (gallery.length === 0) {
         gallery.push(publicUrl);

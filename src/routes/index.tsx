@@ -24,7 +24,7 @@ const categories = [
 function Index() {
   const [dbListings, setDbListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Filters
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState("");
@@ -37,7 +37,7 @@ function Index() {
         category: selectedCategory,
         priceSort: priceSort,
         search: searchQuery || undefined,
-      }
+      },
     })
       .then((data) => {
         setDbListings(data);
@@ -148,10 +148,16 @@ function Index() {
               onClick={() => handleCategoryClick(c.label)}
               className={`group flex flex-col items-center cursor-pointer transition-all duration-200 ${selectedCategory === c.label ? "scale-105" : ""}`}
             >
-              <div className={`aspect-square w-20 overflow-hidden rounded-full border-2 ${selectedCategory === c.label ? "border-primary shadow-lg scale-105" : "border-transparent group-hover:border-primary/50"}`}>
+              <div
+                className={`aspect-square w-20 overflow-hidden rounded-full border-2 ${selectedCategory === c.label ? "border-primary shadow-lg scale-105" : "border-transparent group-hover:border-primary/50"}`}
+              >
                 <img src={c.img} alt={c.label} className="h-full w-full object-cover" />
               </div>
-              <span className={`mt-2 text-xs font-bold uppercase ${selectedCategory === c.label ? "text-primary font-black" : "text-foreground"}`}>{c.label}</span>
+              <span
+                className={`mt-2 text-xs font-bold uppercase ${selectedCategory === c.label ? "text-primary font-black" : "text-foreground"}`}
+              >
+                {c.label}
+              </span>
             </button>
           ))}
         </div>
@@ -163,10 +169,12 @@ function Index() {
           <div>
             <h2 className="text-2xl font-black uppercase tracking-wider">Trending Pre-Loved</h2>
             <p className="text-xs text-muted-foreground">
-              {loading ? "Refreshing..." : `${dbListings.length} verified items listed from actual Myntra purchases`}
+              {loading
+                ? "Refreshing..."
+                : `${dbListings.length} verified items listed from actual Myntra purchases`}
             </p>
           </div>
-          
+
           <div className="flex flex-wrap items-center gap-3">
             {/* Search bar */}
             <div className="relative flex-1 min-w-[200px] md:flex-initial">
@@ -217,7 +225,10 @@ function Index() {
           <div className="mt-3 flex items-center gap-2 text-xs">
             <span className="bg-primary/10 text-primary px-2.5 py-1 rounded-full font-bold uppercase flex items-center gap-1.5">
               Category: {selectedCategory}
-              <button onClick={() => setSelectedCategory(undefined)} className="hover:text-primary-foreground hover:bg-primary rounded-full p-0.5">
+              <button
+                onClick={() => setSelectedCategory(undefined)}
+                className="hover:text-primary-foreground hover:bg-primary rounded-full p-0.5"
+              >
                 <X className="h-3 w-3" />
               </button>
             </span>

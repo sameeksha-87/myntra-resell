@@ -5,7 +5,18 @@ import { useRequireAuth } from "@/lib/require-auth";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ShieldAlert, PackageCheck, ClipboardCheck, ArrowRight, Loader2, CheckCircle2, AlertTriangle, Coins, RefreshCw, Layers } from "lucide-react";
+import {
+  ShieldAlert,
+  PackageCheck,
+  ClipboardCheck,
+  ArrowRight,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
+  Coins,
+  RefreshCw,
+  Layers,
+} from "lucide-react";
 import { inr } from "@/lib/mock-data";
 import { inspectorSubmitReport, adminResolveDispute } from "@/integrations/supabase/actions.server";
 
@@ -24,14 +35,16 @@ function AdminPage() {
   // Stats
   const [escrowBalance, setEscrowBalance] = useState(0);
   const [commissionBalance, setCommissionBalance] = useState(0);
-  
+
   // Inspection Queue
   const [inspectQueue, setInspectQueue] = useState<any[]>([]);
   const [inspectLoading, setInspectLoading] = useState(true);
-  
+
   // Active Inspection Form State
   const [activeListing, setActiveListing] = useState<any | null>(null);
-  const [confirmedGrade, setConfirmedGrade] = useState<"Pristine" | "Excellent" | "Good">("Excellent");
+  const [confirmedGrade, setConfirmedGrade] = useState<"Pristine" | "Excellent" | "Good">(
+    "Excellent",
+  );
   const [inspectionPassed, setInspectionPassed] = useState(true);
   const [inspectionNotes, setInspectionNotes] = useState("");
   const [submittingReport, setSubmittingReport] = useState(false);
@@ -52,7 +65,8 @@ function AdminPage() {
       // Fetch listings in 'sold' or related shipping/pickup pending status
       const { data, error } = await supabase
         .from("listings")
-        .select(`
+        .select(
+          `
           id,
           title,
           brand,
@@ -66,7 +80,8 @@ function AdminPage() {
             final_price_paise,
             status
           )
-        `)
+        `,
+        )
         .in("status", ["sold", "pickup_scheduled", "picked_up"]);
 
       if (error) throw error;
@@ -83,7 +98,8 @@ function AdminPage() {
     try {
       const { data, error } = await supabase
         .from("disputes")
-        .select(`
+        .select(
+          `
           id,
           reason,
           status,
@@ -98,7 +114,8 @@ function AdminPage() {
               brand
             )
           )
-        `)
+        `,
+        )
         .eq("status", "open");
 
       if (error) throw error;
@@ -169,7 +186,7 @@ function AdminPage() {
           confirmedGrade: confirmedGrade,
           passed: inspectionPassed,
           notes: inspectionNotes || undefined,
-        }
+        },
       });
 
       toast.success(`Doorstep inspection report submitted! Outcome: ${result.outcome}`);
@@ -194,9 +211,11 @@ function AdminPage() {
           disputeId,
           resolutionAction: action,
           notes: resolutionNotes,
-        }
+        },
       });
-      toast.success(`Dispute resolved. Outcome: ${action === "refund" ? "refunded" : "payout released"}`);
+      toast.success(
+        `Dispute resolved. Outcome: ${action === "refund" ? "refunded" : "payout released"}`,
+      );
       setResolutionNotes("");
       refreshAll();
     } catch (err: any) {
@@ -212,7 +231,9 @@ function AdminPage() {
         <SiteHeader />
         <div className="flex flex-col items-center justify-center py-32 gap-3">
           <Loader2 className="h-8 w-8 text-primary animate-spin" />
-          <p className="text-sm text-muted-foreground font-semibold">Authorizing staff credentials...</p>
+          <p className="text-sm text-muted-foreground font-semibold">
+            Authorizing staff credentials...
+          </p>
         </div>
         <SiteFooter />
       </div>
@@ -230,7 +251,8 @@ function AdminPage() {
           </span>
           <h1 className="mt-3 text-3xl font-black md:text-4xl">Operations Dashboard</h1>
           <p className="mt-2 max-w-xl text-white/85">
-            Audit AI verification checks, perform doorstep inspection grade clearances, resolve buyer disputes, and audit ledger accounts.
+            Audit AI verification checks, perform doorstep inspection grade clearances, resolve
+            buyer disputes, and audit ledger accounts.
           </p>
         </div>
       </section>
@@ -240,12 +262,16 @@ function AdminPage() {
         <div className="mx-auto max-w-6xl px-6 grid grid-cols-3 gap-6 text-center">
           <div className="rounded-md border border-border p-4 bg-background">
             <Coins className="mx-auto h-5 w-5 text-primary mb-1.5" />
-            <div className="text-xs font-bold uppercase text-muted-foreground">Total Escrow Hold</div>
+            <div className="text-xs font-bold uppercase text-muted-foreground">
+              Total Escrow Hold
+            </div>
             <div className="mt-1 text-xl font-black text-foreground">{inr(escrowBalance)}</div>
           </div>
           <div className="rounded-md border border-border p-4 bg-background">
             <Coins className="mx-auto h-5 w-5 text-success mb-1.5" />
-            <div className="text-xs font-bold uppercase text-muted-foreground">Myntra Commissions</div>
+            <div className="text-xs font-bold uppercase text-muted-foreground">
+              Myntra Commissions
+            </div>
             <div className="mt-1 text-xl font-black text-success">{inr(commissionBalance)}</div>
           </div>
           <div className="rounded-md border border-border p-4 bg-background">
@@ -263,7 +289,9 @@ function AdminPage() {
             <button
               onClick={() => setActiveTab("inspect")}
               className={`py-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
-                activeTab === "inspect" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+                activeTab === "inspect"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
               <PackageCheck className="h-4 w-4" /> Inspection Queue ({inspectQueue.length})
@@ -271,7 +299,9 @@ function AdminPage() {
             <button
               onClick={() => setActiveTab("disputes")}
               className={`py-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
-                activeTab === "disputes" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+                activeTab === "disputes"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
               <ShieldAlert className="h-4 w-4" /> Disputes Center ({disputes.length})
@@ -279,13 +309,15 @@ function AdminPage() {
             <button
               onClick={() => setActiveTab("ledger")}
               className={`py-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
-                activeTab === "ledger" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+                activeTab === "ledger"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
               <Layers className="h-4 w-4" /> Double-Entry Ledger
             </button>
           </div>
-          
+
           <button
             onClick={refreshAll}
             className="p-2 border border-border rounded-full hover:bg-muted text-muted-foreground cursor-pointer"
@@ -301,17 +333,25 @@ function AdminPage() {
         {activeTab === "inspect" && (
           <div>
             <div className="mb-4">
-              <h2 className="text-lg font-black uppercase tracking-wide">Doorstep Pickups awaiting Inspection</h2>
-              <p className="text-xs text-muted-foreground">Perform structural, light, and odor checks on items picked up from sellers</p>
+              <h2 className="text-lg font-black uppercase tracking-wide">
+                Doorstep Pickups awaiting Inspection
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Perform structural, light, and odor checks on items picked up from sellers
+              </p>
             </div>
 
             {inspectLoading ? (
-              <div className="py-12 text-center text-xs text-muted-foreground animate-pulse">Loading inspection items...</div>
+              <div className="py-12 text-center text-xs text-muted-foreground animate-pulse">
+                Loading inspection items...
+              </div>
             ) : inspectQueue.length === 0 ? (
               <div className="py-16 text-center border border-dashed border-border rounded-md bg-card">
                 <ClipboardCheck className="mx-auto h-8 w-8 text-muted-foreground" />
                 <h3 className="mt-2 font-bold">Inspection queue empty</h3>
-                <p className="text-xs text-muted-foreground mt-1">Sold listing orders will automatically appear here for doorstep grading.</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Sold listing orders will automatically appear here for doorstep grading.
+                </p>
               </div>
             ) : (
               <div className="grid gap-4">
@@ -321,15 +361,22 @@ function AdminPage() {
                     className="flex flex-col gap-4 rounded-md border border-border bg-card p-4 shadow-card md:flex-row md:items-center justify-between"
                   >
                     <div>
-                      <div className="text-[10px] text-muted-foreground font-mono">LISTING ID: {item.id.slice(0, 8).toUpperCase()}</div>
-                      <div className="mt-1 text-sm font-bold text-foreground">{item.brand} · {item.title}</div>
+                      <div className="text-[10px] text-muted-foreground font-mono">
+                        LISTING ID: {item.id.slice(0, 8).toUpperCase()}
+                      </div>
+                      <div className="mt-1 text-sm font-bold text-foreground">
+                        {item.brand} · {item.title}
+                      </div>
                       <div className="mt-1 flex gap-3 text-[11px] text-muted-foreground">
                         <span>Size: {item.size}</span>
-                        <span>Declared Grade: <span className="font-bold text-primary">{item.declared_grade}</span></span>
+                        <span>
+                          Declared Grade:{" "}
+                          <span className="font-bold text-primary">{item.declared_grade}</span>
+                        </span>
                         <span>Price Paid: {inr(Number(item.current_price_paise) / 100)}</span>
                       </div>
                     </div>
-                    
+
                     <button
                       onClick={() => handleOpenInspectModal(item)}
                       className="px-4 py-2 bg-primary text-white text-xs font-bold uppercase tracking-wider rounded cursor-pointer hover:bg-primary/95 shadow"
@@ -344,17 +391,27 @@ function AdminPage() {
             {/* Inspection report modal */}
             {activeListing && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
-                <form onSubmit={handleSubmitInspection} className="relative w-full max-w-md rounded-xl border border-border bg-card p-5 text-card-foreground shadow-2xl">
+                <form
+                  onSubmit={handleSubmitInspection}
+                  className="relative w-full max-w-md rounded-xl border border-border bg-card p-5 text-card-foreground shadow-2xl"
+                >
                   <h3 className="text-base font-black uppercase tracking-wider flex items-center gap-1.5">
-                    <PackageCheck className="h-5 w-5 text-primary animate-pulse" /> Submit Inspection Report
+                    <PackageCheck className="h-5 w-5 text-primary animate-pulse" /> Submit
+                    Inspection Report
                   </h3>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Conducting doorstep checks on: <span className="font-bold">{activeListing.brand} · {activeListing.title}</span> (Declared: {activeListing.declared_grade})
+                    Conducting doorstep checks on:{" "}
+                    <span className="font-bold">
+                      {activeListing.brand} · {activeListing.title}
+                    </span>{" "}
+                    (Declared: {activeListing.declared_grade})
                   </p>
 
                   <div className="mt-5 space-y-4 text-xs">
                     <div>
-                      <label className="font-bold uppercase tracking-wider text-muted-foreground block mb-2">Grade Verification Decision</label>
+                      <label className="font-bold uppercase tracking-wider text-muted-foreground block mb-2">
+                        Grade Verification Decision
+                      </label>
                       <div className="flex gap-2">
                         {["Pristine", "Excellent", "Good"].map((g) => (
                           <button
@@ -362,7 +419,9 @@ function AdminPage() {
                             type="button"
                             onClick={() => setConfirmedGrade(g as any)}
                             className={`flex-1 py-2 border text-center font-bold rounded cursor-pointer transition ${
-                              confirmedGrade === g ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-foreground"
+                              confirmedGrade === g
+                                ? "border-primary bg-primary/5 text-primary"
+                                : "border-border hover:border-foreground"
                             }`}
                           >
                             {g}
@@ -372,13 +431,17 @@ function AdminPage() {
                     </div>
 
                     <div>
-                      <label className="font-bold uppercase tracking-wider text-muted-foreground block mb-2">Doorstep Quality Tests</label>
+                      <label className="font-bold uppercase tracking-wider text-muted-foreground block mb-2">
+                        Doorstep Quality Tests
+                      </label>
                       <div className="flex gap-2">
                         <button
                           type="button"
                           onClick={() => setInspectionPassed(true)}
                           className={`flex-1 py-2 border text-center font-bold rounded cursor-pointer ${
-                            inspectionPassed ? "border-success bg-success/5 text-success" : "border-border"
+                            inspectionPassed
+                              ? "border-success bg-success/5 text-success"
+                              : "border-border"
                           }`}
                         >
                           Clear & Pass
@@ -387,23 +450,27 @@ function AdminPage() {
                           type="button"
                           onClick={() => setInspectionPassed(false)}
                           className={`flex-1 py-2 border text-center font-bold rounded cursor-pointer ${
-                            !inspectionPassed ? "border-destructive bg-destructive/5 text-destructive" : "border-border"
+                            !inspectionPassed
+                              ? "border-destructive bg-destructive/5 text-destructive"
+                              : "border-border"
                           }`}
                         >
                           Reject & Cancel
                         </button>
                       </div>
                       <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed">
-                        {!inspectionPassed 
-                          ? "Rejection triggers an immediate buyer refund and schedules item return to seller." 
-                          : confirmedGrade !== activeListing.declared_grade 
+                        {!inspectionPassed
+                          ? "Rejection triggers an immediate buyer refund and schedules item return to seller."
+                          : confirmedGrade !== activeListing.declared_grade
                             ? "Grade revision triggers an approval prompt sent to the buyer. Shipment halts."
                             : "Passing clears shipment to move in transit directly. Seller payout scheduled."}
                       </p>
                     </div>
 
                     <div>
-                      <label className="font-bold uppercase tracking-wider text-muted-foreground block mb-1">Inspection Notes</label>
+                      <label className="font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                        Inspection Notes
+                      </label>
                       <textarea
                         placeholder="Write detailed inspection outcomes (e.g. slight seam fraying)..."
                         value={inspectionNotes}
@@ -426,7 +493,8 @@ function AdminPage() {
                       disabled={submittingReport}
                       className="inline-flex items-center gap-1 bg-primary text-white px-5 py-2 font-bold uppercase rounded cursor-pointer shadow hover:bg-primary/95 disabled:opacity-40"
                     >
-                      {submittingReport && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Submit Report
+                      {submittingReport && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Submit
+                      Report
                     </button>
                   </div>
                 </form>
@@ -440,16 +508,22 @@ function AdminPage() {
           <div>
             <div className="mb-4">
               <h2 className="text-lg font-black uppercase tracking-wide">Buyer Disputes Center</h2>
-              <p className="text-xs text-muted-foreground">Moderate disputes filed within the 48-hour buyer protection window</p>
+              <p className="text-xs text-muted-foreground">
+                Moderate disputes filed within the 48-hour buyer protection window
+              </p>
             </div>
 
             {disputesLoading ? (
-              <div className="py-12 text-center text-xs text-muted-foreground animate-pulse">Loading disputes...</div>
+              <div className="py-12 text-center text-xs text-muted-foreground animate-pulse">
+                Loading disputes...
+              </div>
             ) : disputes.length === 0 ? (
               <div className="py-16 text-center border border-dashed border-border rounded-md bg-card">
                 <CheckCircle2 className="mx-auto h-8 w-8 text-success" />
                 <h3 className="mt-2 font-bold">No active disputes</h3>
-                <p className="text-xs text-muted-foreground mt-1">Disputes raised by buyers on delivered items will appear here.</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Disputes raised by buyers on delivered items will appear here.
+                </p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -461,15 +535,21 @@ function AdminPage() {
                       key={disp.id}
                       className="rounded-md border border-border bg-card p-5 shadow-card leading-relaxed text-xs"
                     >
-                      <div className="font-mono text-muted-foreground mb-1 text-[10px]">DISPUTE ID: {disp.id.toUpperCase()}</div>
-                      <div className="font-bold text-sm text-foreground">{list.brand} · {list.title}</div>
-                      
+                      <div className="font-mono text-muted-foreground mb-1 text-[10px]">
+                        DISPUTE ID: {disp.id.toUpperCase()}
+                      </div>
+                      <div className="font-bold text-sm text-foreground">
+                        {list.brand} · {list.title}
+                      </div>
+
                       <div className="mt-2 text-destructive bg-destructive/5 border border-destructive/10 p-3 rounded font-semibold leading-normal">
                         Complainant Reason: "{disp.reason}"
                       </div>
 
                       <div className="mt-3">
-                        <label className="font-bold uppercase tracking-wider text-muted-foreground block mb-1">Resolution Audit notes</label>
+                        <label className="font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                          Resolution Audit notes
+                        </label>
                         <input
                           type="text"
                           placeholder="Provide details on moderation outcome..."
@@ -508,16 +588,22 @@ function AdminPage() {
           <div>
             <div className="mb-4">
               <h2 className="text-lg font-black uppercase tracking-wide">Double-Entry Ledger</h2>
-              <p className="text-xs text-muted-foreground">Immutable business audit trail of all cash flows inside Escrow and payout nodes</p>
+              <p className="text-xs text-muted-foreground">
+                Immutable business audit trail of all cash flows inside Escrow and payout nodes
+              </p>
             </div>
 
             {ledgerLoading ? (
-              <div className="py-12 text-center text-xs text-muted-foreground animate-pulse">Loading ledger...</div>
+              <div className="py-12 text-center text-xs text-muted-foreground animate-pulse">
+                Loading ledger...
+              </div>
             ) : ledgerEntries.length === 0 ? (
               <div className="py-16 text-center border border-dashed border-border rounded-md bg-card">
                 <Coins className="mx-auto h-8 w-8 text-muted-foreground" />
                 <h3 className="mt-2 font-bold">Ledger is empty</h3>
-                <p className="text-xs text-muted-foreground mt-1">Transaction entries will log here as checkouts and audits occur.</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Transaction entries will log here as checkouts and audits occur.
+                </p>
               </div>
             ) : (
               <div className="overflow-x-auto rounded border border-border bg-card">
@@ -535,12 +621,26 @@ function AdminPage() {
                   <tbody className="divide-y divide-border text-foreground">
                     {ledgerEntries.map((entry) => (
                       <tr key={entry.id} className="hover:bg-muted/30">
-                        <td className="p-3 font-mono text-[10px] text-muted-foreground">{entry.id.slice(0, 8).toUpperCase()}</td>
+                        <td className="p-3 font-mono text-[10px] text-muted-foreground">
+                          {entry.id.slice(0, 8).toUpperCase()}
+                        </td>
                         <td className="p-3 capitalize">{entry.reference_type.replace("_", " ")}</td>
-                        <td className="p-3"><span className="bg-zinc-100 px-1.5 py-0.5 rounded text-zinc-800 font-semibold">{entry.account_from}</span></td>
-                        <td className="p-3"><span className="bg-zinc-100 px-1.5 py-0.5 rounded text-zinc-800 font-semibold">{entry.account_to}</span></td>
-                        <td className="p-3 font-bold text-foreground">{inr(Number(entry.amount_paise) / 100)}</td>
-                        <td className="p-3 text-muted-foreground">{new Date(entry.created_at).toLocaleTimeString()}</td>
+                        <td className="p-3">
+                          <span className="bg-zinc-100 px-1.5 py-0.5 rounded text-zinc-800 font-semibold">
+                            {entry.account_from}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <span className="bg-zinc-100 px-1.5 py-0.5 rounded text-zinc-800 font-semibold">
+                            {entry.account_to}
+                          </span>
+                        </td>
+                        <td className="p-3 font-bold text-foreground">
+                          {inr(Number(entry.amount_paise) / 100)}
+                        </td>
+                        <td className="p-3 text-muted-foreground">
+                          {new Date(entry.created_at).toLocaleTimeString()}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

@@ -2,7 +2,19 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { inr } from "@/lib/mock-data";
-import { ArrowRight, PackageCheck, Sparkles, AlertCircle, ShoppingBag, Loader2, ClipboardList, ShoppingCart, RefreshCw, ChevronRight, Package } from "lucide-react";
+import {
+  ArrowRight,
+  PackageCheck,
+  Sparkles,
+  AlertCircle,
+  ShoppingBag,
+  Loader2,
+  ClipboardList,
+  ShoppingCart,
+  RefreshCw,
+  ChevronRight,
+  Package,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -11,9 +23,7 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/orders")({
   head: () => ({
-    meta: [
-      { title: "My Closet & Orders — ReSell by Myntra" },
-    ],
+    meta: [{ title: "My Closet & Orders — ReSell by Myntra" }],
   }),
   component: OrdersPage,
 });
@@ -24,7 +34,7 @@ function OrdersPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>("closet");
-  
+
   // Closet items (mock Myntra orders)
   const [closetItems, setClosetItems] = useState<any[]>([]);
   const [closetLoading, setClosetLoading] = useState(true);
@@ -41,9 +51,7 @@ function OrdersPage() {
   const fetchCloset = async () => {
     setClosetLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("myntra_order_items")
-        .select(`
+      const { data, error } = await supabase.from("myntra_order_items").select(`
           id,
           title,
           size,
@@ -68,11 +76,11 @@ function OrdersPage() {
         // Call server action to seed mock orders for new user
         await seedUserOrders();
         setSeeding(false);
-        
+
         // Re-fetch
-        const { data: refetchedData, error: refetchError } = await supabase
-          .from("myntra_order_items")
-          .select(`
+        const { data: refetchedData, error: refetchError } = await supabase.from(
+          "myntra_order_items",
+        ).select(`
             id,
             title,
             size,
@@ -107,7 +115,8 @@ function OrdersPage() {
     try {
       const { data, error } = await supabase
         .from("resale_orders")
-        .select(`
+        .select(
+          `
           id,
           final_price_paise,
           status,
@@ -123,7 +132,8 @@ function OrdersPage() {
               storage_key
             )
           )
-        `)
+        `,
+        )
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -139,7 +149,7 @@ function OrdersPage() {
         return {
           id: row.id,
           listing_id: l.id,
-          title: l.title,
+          title: (l.title || "").split("|||")[0],
           brand: l.brand,
           size: l.size,
           declaredGrade: l.declared_grade,
@@ -165,7 +175,8 @@ function OrdersPage() {
     try {
       const { data, error } = await supabase
         .from("listings")
-        .select(`
+        .select(
+          `
           id,
           title,
           brand,
@@ -179,7 +190,8 @@ function OrdersPage() {
           listing_media (
             storage_key
           )
-        `)
+        `,
+        )
         .eq("seller_id", user!.id)
         .order("created_at", { ascending: false });
 
@@ -194,7 +206,7 @@ function OrdersPage() {
 
         return {
           id: l.id,
-          title: l.title,
+          title: (l.title || "").split("|||")[0],
           brand: l.brand,
           size: l.size,
           price: Number(l.current_price_paise) / 100,
@@ -243,38 +255,79 @@ function OrdersPage() {
   const activeListingItemIds = new Set(
     myListings
       .filter((l) => !["verification_failed", "cancelled", "withdrawn"].includes(l.status))
-      .map((l) => l.source_order_item_id)
+      .map((l) => l.source_order_item_id),
   );
 
   const eligibleItems = closetItems.filter(
-    (i) => i.eligibility_decisions?.eligible && !activeListingItemIds.has(i.id)
+    (i) => i.eligibility_decisions?.eligible && !activeListingItemIds.has(i.id),
   );
   const ineligibleItems = closetItems.filter((i) => !i.eligibility_decisions?.eligible);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "created":
-        return <span className="bg-zinc-100 text-zinc-800 text-[10px] font-bold uppercase px-2 py-0.5 rounded">Ordered</span>;
+        return (
+          <span className="bg-zinc-100 text-zinc-800 text-[10px] font-bold uppercase px-2 py-0.5 rounded">
+            Ordered
+          </span>
+        );
       case "sold":
-        return <span className="bg-primary/10 text-primary text-[10px] font-bold uppercase px-2 py-0.5 rounded">Paid (Escrow)</span>;
+        return (
+          <span className="bg-primary/10 text-primary text-[10px] font-bold uppercase px-2 py-0.5 rounded">
+            Paid (Escrow)
+          </span>
+        );
       case "in_transit":
-        return <span className="bg-blue-100 text-blue-800 text-[10px] font-bold uppercase px-2 py-0.5 rounded">Shipped</span>;
+        return (
+          <span className="bg-blue-100 text-blue-800 text-[10px] font-bold uppercase px-2 py-0.5 rounded">
+            Shipped
+          </span>
+        );
       case "delivered":
-        return <span className="bg-green-100 text-green-800 text-[10px] font-bold uppercase px-2 py-0.5 rounded">Delivered</span>;
+        return (
+          <span className="bg-green-100 text-green-800 text-[10px] font-bold uppercase px-2 py-0.5 rounded">
+            Delivered
+          </span>
+        );
       case "buyer_approval_pending":
-        return <span className="bg-warning/10 text-warning-foreground text-[10px] font-bold uppercase px-2 py-0.5 rounded animate-pulse">Action Required</span>;
+        return (
+          <span className="bg-warning/10 text-warning-foreground text-[10px] font-bold uppercase px-2 py-0.5 rounded animate-pulse">
+            Action Required
+          </span>
+        );
       case "disputed":
-        return <span className="bg-destructive/10 text-destructive text-[10px] font-bold uppercase px-2 py-0.5 rounded">Disputed</span>;
+        return (
+          <span className="bg-destructive/10 text-destructive text-[10px] font-bold uppercase px-2 py-0.5 rounded">
+            Disputed
+          </span>
+        );
       case "completed":
-        return <span className="bg-green-100 text-green-800 text-[10px] font-bold uppercase px-2 py-0.5 rounded">Completed</span>;
+        return (
+          <span className="bg-green-100 text-green-800 text-[10px] font-bold uppercase px-2 py-0.5 rounded">
+            Completed
+          </span>
+        );
       case "cancelled":
-        return <span className="bg-zinc-100 text-zinc-400 text-[10px] font-bold uppercase px-2 py-0.5 rounded">Cancelled</span>;
+        return (
+          <span className="bg-zinc-100 text-zinc-400 text-[10px] font-bold uppercase px-2 py-0.5 rounded">
+            Cancelled
+          </span>
+        );
       default:
-        return <span className="bg-zinc-100 text-zinc-800 text-[10px] font-bold uppercase px-2 py-0.5 rounded">{status}</span>;
+        return (
+          <span className="bg-zinc-100 text-zinc-800 text-[10px] font-bold uppercase px-2 py-0.5 rounded">
+            {status}
+          </span>
+        );
     }
   };
 
-  if (authLoading || (activeTab === "closet" && closetLoading && !seeding) || (activeTab === "purchases" && purchasesLoading) || (activeTab === "listings" && listingsLoading)) {
+  if (
+    authLoading ||
+    (activeTab === "closet" && closetLoading && !seeding) ||
+    (activeTab === "purchases" && purchasesLoading) ||
+    (activeTab === "listings" && listingsLoading)
+  ) {
     return (
       <div className="min-h-screen bg-background">
         <SiteHeader />
@@ -300,7 +353,8 @@ function OrdersPage() {
           </span>
           <h1 className="mt-3 text-3xl font-black md:text-4xl">My Closet & Orders</h1>
           <p className="mt-2 max-w-xl text-white/85">
-            Manage your past Myntra orders, list qualifying clothes for resale, or track items you purchased on the pre-loved marketplace.
+            Manage your past Myntra orders, list qualifying clothes for resale, or track items you
+            purchased on the pre-loved marketplace.
           </p>
         </div>
       </section>
@@ -311,7 +365,9 @@ function OrdersPage() {
           <button
             onClick={() => setActiveTab("closet")}
             className={`py-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === "closet" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+              activeTab === "closet"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             <ClipboardList className="h-4 w-4" /> Resell Closet ({closetItems.length})
@@ -319,7 +375,9 @@ function OrdersPage() {
           <button
             onClick={() => setActiveTab("listings")}
             className={`py-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === "listings" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+              activeTab === "listings"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             <Package className="h-4 w-4" /> My Listings ({myListings.length})
@@ -327,7 +385,9 @@ function OrdersPage() {
           <button
             onClick={() => setActiveTab("purchases")}
             className={`py-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === "purchases" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+              activeTab === "purchases"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             <ShoppingCart className="h-4 w-4" /> My Purchases ({purchases.length})
@@ -342,7 +402,9 @@ function OrdersPage() {
               <h2 className="text-lg font-black uppercase tracking-wide">
                 Eligible Closet · {eligibleItems.length}
               </h2>
-              <p className="text-xs text-muted-foreground">Verification-guaranteed · Premium brands · Delivered &lt; 3 years ago</p>
+              <p className="text-xs text-muted-foreground">
+                Verification-guaranteed · Premium brands · Delivered &lt; 3 years ago
+              </p>
             </div>
 
             {eligibleItems.length === 0 ? (
@@ -350,7 +412,8 @@ function OrdersPage() {
                 <ShoppingBag className="mx-auto h-8 w-8 text-muted-foreground" />
                 <h3 className="mt-2 font-bold">No eligible items found</h3>
                 <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto text-pretty">
-                  Only items purchased on Myntra from premium brands with a purchase price greater than ₹3,000 qualify.
+                  Only items purchased on Myntra from premium brands with a purchase price greater
+                  than ₹3,000 qualify.
                 </p>
               </div>
             ) : (
@@ -358,9 +421,12 @@ function OrdersPage() {
                 {eligibleItems.map((item) => {
                   const order = item.myntra_orders || {};
                   const dateStr = order.delivered_at
-                    ? new Date(order.delivered_at).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
+                    ? new Date(order.delivered_at).toLocaleDateString("en-IN", {
+                        month: "short",
+                        year: "numeric",
+                      })
                     : "Recent";
-                  
+
                   return (
                     <div
                       key={item.id}
@@ -413,7 +479,10 @@ function OrdersPage() {
                   {ineligibleItems.map((item) => {
                     const order = item.myntra_orders || {};
                     const dateStr = order.delivered_at
-                      ? new Date(order.delivered_at).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
+                      ? new Date(order.delivered_at).toLocaleDateString("en-IN", {
+                          month: "short",
+                          year: "numeric",
+                        })
                       : "Recent";
 
                     return (
@@ -430,7 +499,9 @@ function OrdersPage() {
                           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                             Delivered {dateStr}
                           </div>
-                          <div className="text-sm font-bold text-muted-foreground">{item.title}</div>
+                          <div className="text-sm font-bold text-muted-foreground">
+                            {item.title}
+                          </div>
                           <div className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-muted-foreground">
                             <span>Size: {item.size}</span>
                             <span>Price: {inr(item.original_price_paise / 100)}</span>
@@ -456,7 +527,9 @@ function OrdersPage() {
                 <h2 className="text-lg font-black uppercase tracking-wide">
                   Order History · {purchases.length}
                 </h2>
-                <p className="text-xs text-muted-foreground">Track shipments, verify inspection revisions, or open disputes</p>
+                <p className="text-xs text-muted-foreground">
+                  Track shipments, verify inspection revisions, or open disputes
+                </p>
               </div>
               <button
                 onClick={fetchPurchases}
@@ -472,7 +545,8 @@ function OrdersPage() {
                 <ShoppingBag className="mx-auto h-10 w-10 text-muted-foreground" />
                 <h3 className="mt-3 text-lg font-bold">No purchases yet</h3>
                 <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto text-pretty">
-                  Explore the marketplace for premium pre-loved fashion. Authenticated circular economy checkout.
+                  Explore the marketplace for premium pre-loved fashion. Authenticated circular
+                  economy checkout.
                 </p>
                 <Link
                   to="/"
@@ -501,25 +575,40 @@ function OrdersPage() {
                       />
                       <div className="flex-1 min-w-0 leading-normal">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] text-muted-foreground font-mono">ORDER ID: {purchase.id.slice(0, 8).toUpperCase()}</span>
-                          <span className="text-[10px] text-muted-foreground">· Purchased {dateStr}</span>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            ORDER ID: {purchase.id.slice(0, 8).toUpperCase()}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            · Purchased {dateStr}
+                          </span>
                           {getStatusBadge(purchase.status)}
                         </div>
-                        <div className="mt-1 text-base font-bold text-foreground">{purchase.brand}</div>
-                        <div className="text-sm text-muted-foreground truncate">{purchase.title}</div>
+                        <div className="mt-1 text-base font-bold text-foreground">
+                          {purchase.brand}
+                        </div>
+                        <div className="text-sm text-muted-foreground truncate">
+                          {purchase.title}
+                        </div>
                         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                          <span><b>Size:</b> {purchase.size}</span>
-                          <span><b>Price Paid:</b> {inr(purchase.price)}</span>
+                          <span>
+                            <b>Size:</b> {purchase.size}
+                          </span>
+                          <span>
+                            <b>Price Paid:</b> {inr(purchase.price)}
+                          </span>
                         </div>
                       </div>
-                      
+
                       <div className="flex flex-col gap-2 w-full md:w-auto">
                         <Link
                           to="/listing/$id"
                           params={{ id: purchase.listing_id }}
                           className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-sm text-center"
                         >
-                          {purchase.status === "buyer_approval_pending" ? "Resolve Terms" : "Track Order"} <ChevronRight className="h-4 w-4" />
+                          {purchase.status === "buyer_approval_pending"
+                            ? "Resolve Terms"
+                            : "Track Order"}{" "}
+                          <ChevronRight className="h-4 w-4" />
                         </Link>
                       </div>
                     </div>
@@ -537,7 +626,9 @@ function OrdersPage() {
                 <h2 className="text-lg font-black uppercase tracking-wide">
                   Active Resell Listings · {myListings.length}
                 </h2>
-                <p className="text-xs text-muted-foreground">Monitor status, review pricing details, and check verification logs</p>
+                <p className="text-xs text-muted-foreground">
+                  Monitor status, review pricing details, and check verification logs
+                </p>
               </div>
               <button
                 onClick={fetchMyListings}
@@ -582,18 +673,30 @@ function OrdersPage() {
                       />
                       <div className="flex-1 min-w-0 leading-normal">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] text-muted-foreground font-mono">LISTING ID: {listing.id.slice(0, 8).toUpperCase()}</span>
-                          <span className="text-[10px] text-muted-foreground">· Listed {dateStr}</span>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            LISTING ID: {listing.id.slice(0, 8).toUpperCase()}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            · Listed {dateStr}
+                          </span>
                           {getStatusBadge(listing.status)}
                         </div>
-                        <div className="mt-1 text-base font-bold text-foreground">{listing.brand}</div>
-                        <div className="text-sm text-muted-foreground truncate">{listing.title}</div>
+                        <div className="mt-1 text-base font-bold text-foreground">
+                          {listing.brand}
+                        </div>
+                        <div className="text-sm text-muted-foreground truncate">
+                          {listing.title}
+                        </div>
                         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                          <span><b>Size:</b> {listing.size}</span>
-                          <span><b>Listing Price:</b> {inr(listing.price)}</span>
+                          <span>
+                            <b>Size:</b> {listing.size}
+                          </span>
+                          <span>
+                            <b>Listing Price:</b> {inr(listing.price)}
+                          </span>
                         </div>
                       </div>
-                      
+
                       <div className="flex flex-col gap-2 w-full md:w-auto">
                         <Link
                           to="/listing/$id"

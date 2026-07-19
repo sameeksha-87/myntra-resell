@@ -7,6 +7,7 @@ import { TrustBadge } from "./trust-badges";
 export function ProductCard({ p }: { p: Product }) {
   const price = computePrice(p.originalPrice, p.ageYears, p.confirmedGrade ?? p.declaredGrade);
   const discount = Math.round((1 - price.listPrice / p.originalPrice) * 100);
+  const [titleOnly] = (p.title || "").split("|||");
 
   return (
     <Link
@@ -17,7 +18,7 @@ export function ProductCard({ p }: { p: Product }) {
       <div className="relative aspect-[4/5] overflow-hidden bg-muted">
         <img
           src={p.image}
-          alt={`${p.brand} ${p.title}`}
+          alt={`${p.brand} ${titleOnly}`}
           loading="lazy"
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
@@ -35,7 +36,7 @@ export function ProductCard({ p }: { p: Product }) {
       </div>
       <div className="p-2">
         <div className="truncate text-sm font-bold">{p.brand}</div>
-        <div className="truncate text-xs text-muted-foreground">{p.title}</div>
+        <div className="truncate text-xs text-muted-foreground">{titleOnly}</div>
         <div className="mt-1 flex items-baseline gap-1.5">
           <span className="text-sm font-bold">{inr(price.listPrice)}</span>
           <span className="text-xs text-muted-foreground line-through">{inr(p.originalPrice)}</span>
