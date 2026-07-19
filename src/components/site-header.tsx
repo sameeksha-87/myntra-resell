@@ -18,6 +18,7 @@ export function SiteHeader() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [coins, setCoins] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -27,6 +28,23 @@ export function SiteHeader() {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setCoins(null);
+      return;
+    }
+    supabase
+      .from("profiles")
+      .select("preferences")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setCoins(Number((data.preferences as any)?.myntra_coins || 0));
+        }
+      });
+  }, [user, open]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -90,11 +108,18 @@ export function SiteHeader() {
                 </button>
                 {open && (
                   <div className="absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-md border border-border bg-popover shadow-lg">
-                    <div className="border-b border-border px-3 py-2">
-                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                        Signed in
+                    <div className="border-b border-border px-3 py-2 flex justify-between items-center">
+                      <div>
+                        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          Signed in
+                        </div>
+                        <div className="truncate text-sm font-semibold max-w-[120px]">{user.email}</div>
                       </div>
-                      <div className="truncate text-sm font-semibold">{user.email}</div>
+                      {coins !== null && (
+                        <div className="flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary" title="Myntra Coins">
+                          🪙 {coins}
+                        </div>
+                      )}
                     </div>
                     <Link
                       to="/profile"

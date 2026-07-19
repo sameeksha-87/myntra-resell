@@ -548,6 +548,41 @@ export const placeCheckoutOrder = createServerFn({ method: "POST" })
       .update({ status: "sold", updated_at: new Date().toISOString() })
       .eq("id", listingId);
 
+    // Credit coins to seller and send notification
+    try {
+      const coinsCredit = Math.round(payoutPaise / 100);
+
+      const { data: sellerProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("preferences")
+        .eq("id", listing.seller_id)
+        .single();
+
+      const currentPrefs = (sellerProfile?.preferences as any) || {};
+      const currentCoins = Number(currentPrefs.myntra_coins || 0);
+      const newCoins = currentCoins + coinsCredit;
+      const updatedPrefs = { ...currentPrefs, myntra_coins: newCoins };
+
+      await supabaseAdmin
+        .from("profiles")
+        .update({ preferences: updatedPrefs, updated_at: new Date().toISOString() })
+        .eq("id", listing.seller_id);
+
+      await supabaseAdmin.from("notifications").insert({
+        user_id: listing.seller_id,
+        template: "order_sold_coins_credited",
+        channel: "in_app",
+        payload: {
+          orderId: order.id,
+          coins: coinsCredit,
+          listingTitle: listing.title,
+          message: `Congratulations! Your item "${listing.title.split("|||")[0]}" has been purchased. ₹${coinsCredit} Myntra Coins have been credited to your account!`,
+        },
+      });
+    } catch (err: any) {
+      console.error("Error crediting seller coins/notification:", err?.message || err);
+    }
+
     // Create Payment transaction (Escrow Auth & Hold)
     await supabaseAdmin.from("payment_transactions").insert({
       order_id: order.id,

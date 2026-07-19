@@ -20,18 +20,21 @@ function ProfilePage() {
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [listingCount, setListingCount] = useState<number | null>(null);
+  const [myntraCoins, setMyntraCoins] = useState<number | null>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user) return;
     supabase
       .from("profiles")
-      .select("full_name,phone")
+      .select("full_name,phone,preferences")
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => {
         if (data) {
           setFullName(data.full_name ?? "");
           setPhone(data.phone ?? "");
+          setMyntraCoins(Number((data.preferences as any)?.myntra_coins || 0));
         }
       });
     supabase
@@ -40,6 +43,15 @@ function ProfilePage() {
       .eq("seller_id", user.id)
       .then(({ count }) => {
         setListingCount(count ?? 0);
+      });
+    supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(5)
+      .then(({ data }) => {
+        if (data) setNotifications(data);
       });
   }, [user]);
 
@@ -120,7 +132,7 @@ function ProfilePage() {
           <h1 className="text-2xl font-black">My Profile</h1>
           <p className="mt-1 text-sm text-muted-foreground">Update how you appear on ReSell.</p>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="mt-4 grid gap-3 grid-cols-2 md:grid-cols-4">
             <Stat label="Active listings" value={listingCount ?? "—"} />
             <Stat
               label="Member since"
@@ -129,7 +141,8 @@ function ProfilePage() {
                 year: "numeric",
               })}
             />
-            <Stat label="Seller score" value="4.8 ★" accent />
+            <Stat label="Seller score" value="4.8 ★" />
+            <Stat label="Myntra Coins" value={myntraCoins !== null ? `🪙 ${myntraCoins}` : "—"} accent />
           </div>
 
           <form
@@ -165,6 +178,34 @@ function ProfilePage() {
               {busy ? "Saving…" : "Save changes"}
             </button>
           </form>
+
+          <div className="mt-10">
+            <h2 className="text-xl font-black">Recent Notifications</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Updates on your listings and sales.</p>
+            {notifications.length === 0 ? (
+              <div className="mt-4 rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground bg-card">
+                No recent notifications.
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {notifications.map((n) => (
+                  <div key={n.id} className="rounded-md border border-border bg-card p-4 flex justify-between items-start gap-4">
+                    <div>
+                      <div className="text-sm font-semibold">{n.payload?.message || n.template}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {new Date(n.created_at).toLocaleString("en-IN")}
+                      </div>
+                    </div>
+                    {n.payload?.coins && (
+                      <span className="shrink-0 inline-flex items-center gap-1 rounded bg-success/15 px-2 py-1 text-xs font-bold text-success">
+                        +🪙 {n.payload.coins}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           {session ? null : null}
         </section>
       </div>

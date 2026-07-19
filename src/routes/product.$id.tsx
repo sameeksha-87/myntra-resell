@@ -228,6 +228,13 @@ function ProductPage() {
   // Helper to ensure mock products have a database listing record before cart/wishlist insertion
   const ensureDbListingForMock = async (mockProduct: any): Promise<string> => {
     if (!user) throw new Error("User required");
+
+    // If the product id is already a valid UUID, return it directly
+    const isUuid = /^[0-9a-f-]{36}$/i.test(mockProduct.id);
+    if (isUuid) {
+      return mockProduct.id;
+    }
+
     const deterministicId = "00000000-0000-0000-0000-" + mockProduct.id.padStart(12, "0");
 
     const { data: existing } = await supabase
