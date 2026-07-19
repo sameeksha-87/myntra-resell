@@ -655,6 +655,12 @@ DECLARE
   cat_shoes UUID;
   cat_skirts UUID;
   cat_shirts UUID;
+
+  o1_id TEXT := 'o-101-' || target_user_id::text;
+  o2_id TEXT := 'o-102-' || target_user_id::text;
+  o3_id TEXT := 'o-103-' || target_user_id::text;
+  o4_id TEXT := 'o-104-' || target_user_id::text;
+  o5_id TEXT := 'o-105-' || target_user_id::text;
 BEGIN
   -- First seed standard catalog metadata
   PERFORM public.seed_catalog_metadata();
@@ -668,105 +674,110 @@ BEGIN
   
   SELECT id INTO cat_outer FROM public.categories WHERE name = 'Outerwear';
   SELECT id INTO cat_shoes FROM public.categories WHERE name = 'Sneakers';
-  SELECT id INTO cat_skirts FROM public.categories WHERE name = 'Dresses'; -- maps to Dresses in UI
-  SELECT id INTO cat_shirts FROM public.categories WHERE name = 'Kids'; -- or shirts if added, mapping to Kids for categorization demo
+  SELECT id INTO cat_skirts FROM public.categories WHERE name = 'Dresses';
+  SELECT id INTO cat_shirts FROM public.categories WHERE name = 'Kids';
 
   -- If user doesn't have orders, create them
   IF NOT EXISTS (SELECT 1 FROM public.myntra_orders WHERE user_id = target_user_id) THEN
     -- Order 1
     INSERT INTO public.myntra_orders (id, user_id, delivered_at)
-    VALUES ('o-101', target_user_id, now() - INTERVAL '1 year');
+    VALUES (o1_id, target_user_id, now() - INTERVAL '1 year')
+    ON CONFLICT (id) DO NOTHING;
     
     INSERT INTO public.myntra_order_items (id, order_id, product_reference, brand_id, category_id, title, size, original_price_paise, image, quantity, status)
     VALUES (
-      '11111111-1111-1111-1111-111111111111',
-      'o-101',
+      gen_random_uuid(),
+      o1_id,
       'TH-JACKET-001',
       brand_tommy,
       cat_outer,
       'Colour-Block Puffer Jacket',
       'M',
-      1499900, -- ₹14,999 in paise
+      1499900,
       'https://images.unsplash.com/photo-1548883354-7622d03aca27?auto=format&fit=crop&q=80&w=400',
       1,
       'delivered'
-    );
+    ) ON CONFLICT DO NOTHING;
     
     -- Order 2
     INSERT INTO public.myntra_orders (id, user_id, delivered_at)
-    VALUES ('o-102', target_user_id, now() - INTERVAL '2 years');
+    VALUES (o2_id, target_user_id, now() - INTERVAL '2 years')
+    ON CONFLICT (id) DO NOTHING;
     
     INSERT INTO public.myntra_order_items (id, order_id, product_reference, brand_id, category_id, title, size, original_price_paise, image, quantity, status)
     VALUES (
-      '22222222-2222-2222-2222-222222222222',
-      'o-102',
+      gen_random_uuid(),
+      o2_id,
       'NIKE-COURT-002',
       brand_nike,
       cat_shoes,
       'Court Vision Low Sneakers',
       'UK 8',
-      649500, -- ₹6,495 in paise
+      649500,
       'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&q=80&w=400',
       1,
       'delivered'
-    );
+    ) ON CONFLICT DO NOTHING;
     
     -- Order 3
     INSERT INTO public.myntra_orders (id, user_id, delivered_at)
-    VALUES ('o-103', target_user_id, now() - INTERVAL '6 months');
+    VALUES (o3_id, target_user_id, now() - INTERVAL '6 months')
+    ON CONFLICT (id) DO NOTHING;
     
     INSERT INTO public.myntra_order_items (id, order_id, product_reference, brand_id, category_id, title, size, original_price_paise, image, quantity, status)
     VALUES (
-      '33333333-3333-3333-3333-333333333333',
-      'o-103',
+      gen_random_uuid(),
+      o3_id,
       'ZARA-SKIRT-003',
       brand_zara,
       cat_skirts,
       'Pleated Satin Midi Skirt',
       'S',
-      399000, -- ₹3,990 in paise
+      399000,
       'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&q=80&w=400',
       1,
       'delivered'
-    );
+    ) ON CONFLICT DO NOTHING;
 
     -- Order 4
     INSERT INTO public.myntra_orders (id, user_id, delivered_at)
-    VALUES ('o-104', target_user_id, now() - INTERVAL '1 year');
+    VALUES (o4_id, target_user_id, now() - INTERVAL '1 year')
+    ON CONFLICT (id) DO NOTHING;
     
     INSERT INTO public.myntra_order_items (id, order_id, product_reference, brand_id, category_id, title, size, original_price_paise, image, quantity, status)
     VALUES (
-      '44444444-4444-4444-4444-444444444444',
-      'o-104',
+      gen_random_uuid(),
+      o4_id,
       'LEVIS-TRUCKER-004',
       brand_levis,
       cat_outer,
       'Trucker Denim Jacket',
       'L',
-      549900, -- ₹5,499 in paise
+      549900,
       'https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&q=80&w=400',
       1,
       'delivered'
-    );
+    ) ON CONFLICT DO NOTHING;
 
     -- Order 5
     INSERT INTO public.myntra_orders (id, user_id, delivered_at)
-    VALUES ('o-105', target_user_id, now() - INTERVAL '1 year');
+    VALUES (o5_id, target_user_id, now() - INTERVAL '1 year')
+    ON CONFLICT (id) DO NOTHING;
     
     INSERT INTO public.myntra_order_items (id, order_id, product_reference, brand_id, category_id, title, size, original_price_paise, image, quantity, status)
     VALUES (
-      '55555555-5555-5555-5555-555555555555',
-      'o-105',
+      gen_random_uuid(),
+      o5_id,
       'ROADSTER-SHIRT-005',
       brand_roadster,
       cat_shirts,
       'Casual Solid Cotton Shirt',
       'M',
-      249900, -- ₹2,499 in paise
+      249900,
       'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&q=80&w=400',
       1,
       'delivered'
-    );
+    ) ON CONFLICT DO NOTHING;
 
     -- Evaluate Eligibility decisions
     -- 1. o-101 Puffer: Original Price > 3000, age < 3 yr => Eligible

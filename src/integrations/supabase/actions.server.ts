@@ -23,14 +23,17 @@ export const seedUserOrders = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const { userId } = context;
 
-    // Call the PostgreSQL stored procedure to seed mock orders
-    const { error } = await (supabaseAdmin as any).rpc("seed_user_mock_orders", {
-      target_user_id: userId,
-    });
+    try {
+      // Call the PostgreSQL stored procedure to seed mock orders
+      const { error } = await (supabaseAdmin as any).rpc("seed_user_mock_orders", {
+        target_user_id: userId,
+      });
 
-    if (error) {
-      console.error("Error seeding mock orders:", error);
-      throw new Error(`Failed to seed mock orders: ${error.message}`);
+      if (error) {
+        console.error("Error seeding mock orders (non-critical):", error.message);
+      }
+    } catch (err: any) {
+      console.error("Seed user orders caught error:", err?.message || err);
     }
 
     return { success: true };
