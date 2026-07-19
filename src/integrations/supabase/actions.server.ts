@@ -510,11 +510,7 @@ export const submitForVerification = createServerFn({ method: "POST" })
         payload: { runId },
       });
 
-<<<<<<< HEAD
-      return { status: "verified", success: true };
-=======
-      return { status: "live", success: true, checkResults };
->>>>>>> d20f2fb (made changes to verification)
+      return { status: "verified", success: true, checkResults };
     } else {
       // Transition to verification_failed
       const reason = !blurPassed
