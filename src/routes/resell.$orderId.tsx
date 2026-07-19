@@ -410,6 +410,7 @@ function ResellFlow() {
               verified={verified}
               failed={verifFailed}
               reason={verifReason}
+              verificationChecks={verificationChecks}
               onContinue={() => setStep(2)}
               onBack={() => {
                 setStep(0); // Let them retake photos if verification failed
@@ -588,12 +589,13 @@ function PhotoStep({
             <button
               key={a.key}
               onClick={() => !isScanning && onTrigger(a.key)}
-              className={`group relative aspect-[3/4] rounded-md border-2 border-dashed p-3 text-left transition ${photoUrl
+              className={`group relative aspect-[3/4] rounded-md border-2 border-dashed p-3 text-left transition ${
+                photoUrl
                   ? "border-success bg-success/5 cursor-pointer"
                   : isScanning
                     ? "border-primary bg-primary/5 cursor-wait"
                     : "border-border hover:border-primary cursor-pointer"
-                }`}
+              }`}
             >
               {photoUrl ? (
                 <>
