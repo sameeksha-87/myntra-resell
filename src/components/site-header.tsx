@@ -113,10 +113,15 @@ export function SiteHeader() {
                         <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                           Signed in
                         </div>
-                        <div className="truncate text-sm font-semibold max-w-[120px]">{user.email}</div>
+                        <div className="truncate text-sm font-semibold max-w-[120px]">
+                          {user.email}
+                        </div>
                       </div>
                       {coins !== null && (
-                        <div className="flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary" title="Myntra Coins">
+                        <div
+                          className="flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary"
+                          title="Myntra Coins"
+                        >
                           🪙 {coins}
                         </div>
                       )}

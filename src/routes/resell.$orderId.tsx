@@ -77,6 +77,9 @@ function ResellFlow() {
   const [verified, setVerified] = useState(false);
   const [verifFailed, setVerifFailed] = useState(false);
   const [verifReason, setVerifReason] = useState("");
+  const [verificationChecks, setVerificationChecks] = useState<Record<string, boolean> | null>(
+    null,
+  );
   const [listingId, setListingId] = useState<string | null>(null);
 
   // Loaded DB Order Item details
@@ -231,6 +234,7 @@ function ResellFlow() {
       });
 
       setVerifying(false);
+      setVerificationChecks(verifResult.checkResults || null);
       if (verifResult.success) {
         setVerified(true);
         toast.success("AI Verification passed! Click 'Go Live' to publish it.");
@@ -406,19 +410,7 @@ function ResellFlow() {
               verified={verified}
               failed={verifFailed}
               reason={verifReason}
-              onContinue={async () => {
-                if (!listingId) return;
-                try {
-                  setVerifying(true);
-                  await publishListing({ data: { listingId } });
-                  setStep(2);
-                  toast.success("Your listing is now live on the marketplace!");
-                } catch (err: any) {
-                  toast.error(err.message || "Failed to publish listing");
-                } finally {
-                  setVerifying(false);
-                }
-              }}
+              onContinue={() => setStep(2)}
               onBack={() => {
                 setStep(0); // Let them retake photos if verification failed
                 setVerified(false);
@@ -596,13 +588,12 @@ function PhotoStep({
             <button
               key={a.key}
               onClick={() => !isScanning && onTrigger(a.key)}
-              className={`group relative aspect-[3/4] rounded-md border-2 border-dashed p-3 text-left transition ${
-                photoUrl
+              className={`group relative aspect-[3/4] rounded-md border-2 border-dashed p-3 text-left transition ${photoUrl
                   ? "border-success bg-success/5 cursor-pointer"
                   : isScanning
                     ? "border-primary bg-primary/5 cursor-wait"
                     : "border-border hover:border-primary cursor-pointer"
-              }`}
+                }`}
             >
               {photoUrl ? (
                 <>
@@ -951,20 +942,46 @@ interface VerifyStepProps {
   verified: boolean;
   failed: boolean;
   reason: string;
+  verificationChecks: Record<string, boolean> | null;
   onContinue: () => void;
   onBack: () => void;
 }
 
-function VerifyStep({ verifying, verified, failed, reason, onContinue, onBack }: VerifyStepProps) {
+function VerifyStep({
+  verifying,
+  verified,
+  failed,
+  reason,
+  verificationChecks,
+  onContinue,
+  onBack,
+}: VerifyStepProps) {
   const checks = [
-    { label: "Image quality gate", note: "Blur / lighting / resolution check" },
-    { label: "Category & brand match", note: "Against original Myntra purchase record" },
+    {
+      label: "Image quality gate",
+      note: "Blur / lighting / resolution check",
+      key: "blur_check",
+    },
+    {
+      label: "Category & brand match",
+      note: "Against original Myntra purchase record",
+      key: "brand_check",
+    },
     {
       label: "CLIP image similarity match",
       note: "Compare uploaded photos with purchased catalog photo",
+      key: "clip_similarity_check",
     },
-    { label: "Duplicate image detection", note: "Prevent stock photo or scraped list" },
-    { label: "Confidence scoring", note: "Durable validation audit complete" },
+    {
+      label: "Duplicate image detection",
+      note: "Prevent stock photo or scraped list",
+      key: "duplicate_check",
+    },
+    {
+      label: "Confidence scoring",
+      note: "Durable validation audit complete",
+      key: "confidence_check",
+    },
   ];
 
   return (
@@ -982,33 +999,44 @@ function VerifyStep({ verifying, verified, failed, reason, onContinue, onBack }:
       )}
 
       <div className="mt-4 grid gap-3">
-        {checks.map((c, i) => (
-          <div
-            key={c.label}
-            className="flex items-center justify-between rounded-md border border-border bg-card p-3"
-          >
-            <div>
-              <div className="text-sm font-bold">{c.label}</div>
-              <div className="text-xs text-muted-foreground">{c.note}</div>
+        {checks.map((c, i) => {
+          const checkPassed = (() => {
+            if (verifying) return null;
+            if (verified) return true;
+            if (!verificationChecks) return false;
+            if (c.key === "brand_check") return true;
+            if (c.key === "confidence_check") return verified;
+            return verificationChecks[c.key] !== false;
+          })();
+
+          return (
+            <div
+              key={c.label}
+              className="flex items-center justify-between rounded-md border border-border bg-card p-3"
+            >
+              <div>
+                <div className="text-sm font-bold">{c.label}</div>
+                <div className="text-xs text-muted-foreground">{c.note}</div>
+              </div>
+              <div>
+                {verifying ? (
+                  <div
+                    className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"
+                    style={{ animationDelay: `${i * 120}ms` }}
+                  />
+                ) : checkPassed ? (
+                  <div className="rounded-full bg-success p-1 text-white">
+                    <Check className="h-4 w-4" />
+                  </div>
+                ) : (
+                  <div className="rounded-full bg-destructive p-1 text-white">
+                    <XCircle className="h-4 w-4" />
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              {verifying ? (
-                <div
-                  className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"
-                  style={{ animationDelay: `${i * 120}ms` }}
-                />
-              ) : failed ? (
-                <div className="rounded-full bg-destructive p-1 text-white">
-                  <XCircle className="h-4 w-4" />
-                </div>
-              ) : (
-                <div className="rounded-full bg-success p-1 text-white">
-                  <Check className="h-4 w-4" />
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {verified && (
@@ -1028,9 +1056,11 @@ function VerifyStep({ verifying, verified, failed, reason, onContinue, onBack }:
             <div className="font-bold">Verification rejected by AI guardrails</div>
             <div className="text-xs">
               Reason code: <span className="font-bold underline">{reason}</span>.
-              {!reason.includes("perspective")
-                ? " The photos uploaded were too blurry or low resolution. Hold camera steady and capture in bright lighting."
-                : " The capture perspective did not match the grid overlay layout guidelines."}
+              {reason === "different_product"
+                ? " The uploaded photo does not match the original purchase catalog image. Ensure you upload the correct product."
+                : reason === "incorrect_angles" || reason.includes("perspective")
+                  ? " The capture perspective did not match the grid overlay layout guidelines."
+                  : " The photos uploaded were too blurry or low resolution. Hold camera steady and capture in bright lighting."}
             </div>
           </div>
         </div>

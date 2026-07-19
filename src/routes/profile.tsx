@@ -142,7 +142,11 @@ function ProfilePage() {
               })}
             />
             <Stat label="Seller score" value="4.8 ★" />
-            <Stat label="Myntra Coins" value={myntraCoins !== null ? `🪙 ${myntraCoins}` : "—"} accent />
+            <Stat
+              label="Myntra Coins"
+              value={myntraCoins !== null ? `🪙 ${myntraCoins}` : "—"}
+              accent
+            />
           </div>
 
           <form
@@ -181,7 +185,9 @@ function ProfilePage() {
 
           <div className="mt-10">
             <h2 className="text-xl font-black">Recent Notifications</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Updates on your listings and sales.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Updates on your listings and sales.
+            </p>
             {notifications.length === 0 ? (
               <div className="mt-4 rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground bg-card">
                 No recent notifications.
@@ -189,9 +195,14 @@ function ProfilePage() {
             ) : (
               <div className="mt-4 space-y-3">
                 {notifications.map((n) => (
-                  <div key={n.id} className="rounded-md border border-border bg-card p-4 flex justify-between items-start gap-4">
+                  <div
+                    key={n.id}
+                    className="rounded-md border border-border bg-card p-4 flex justify-between items-start gap-4"
+                  >
                     <div>
-                      <div className="text-sm font-semibold">{n.payload?.message || n.template}</div>
+                      <div className="text-sm font-semibold">
+                        {n.payload?.message || n.template}
+                      </div>
                       <div className="mt-1 text-xs text-muted-foreground">
                         {new Date(n.created_at).toLocaleString("en-IN")}
                       </div>
