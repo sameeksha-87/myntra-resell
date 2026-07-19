@@ -18,7 +18,7 @@ import {
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
-import { seedUserOrders } from "@/integrations/supabase/actions.server";
+import { seedUserOrders, publishListing } from "@/integrations/supabase/actions.server";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/orders")({
@@ -47,6 +47,20 @@ function OrdersPage() {
   // Listings uploaded by this user for selling
   const [myListings, setMyListings] = useState<any[]>([]);
   const [listingsLoading, setListingsLoading] = useState(true);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+
+  const handleGoLive = async (listingId: string) => {
+    setPublishingId(listingId);
+    try {
+      await publishListing({ data: { listingId } });
+      toast.success("Listing is now live on the marketplace!");
+      fetchMyListings();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to publish listing");
+    } finally {
+      setPublishingId(null);
+    }
+  };
 
   const fetchCloset = async () => {
     setClosetLoading(true);
@@ -305,6 +319,12 @@ function OrdersPage() {
         return (
           <span className="bg-green-100 text-green-800 text-[10px] font-bold uppercase px-2 py-0.5 rounded">
             Completed
+          </span>
+        );
+      case "verified":
+        return (
+          <span className="bg-verified/15 text-verified text-[10px] font-bold uppercase px-2 py-0.5 rounded">
+            Verified
           </span>
         );
       case "cancelled":
@@ -698,13 +718,38 @@ function OrdersPage() {
                       </div>
 
                       <div className="flex flex-col gap-2 w-full md:w-auto">
-                        <Link
-                          to="/listing/$id"
-                          params={{ id: listing.id }}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-sm text-center"
-                        >
-                          Track Status <ChevronRight className="h-4 w-4" />
-                        </Link>
+                        {listing.status === "verified" ? (
+                          <>
+                            <button
+                              onClick={() => handleGoLive(listing.id)}
+                              disabled={publishingId === listing.id}
+                              className="inline-flex items-center justify-center gap-1.5 rounded-md bg-verified px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white hover:bg-verified/90 transition-all cursor-pointer shadow-sm text-center disabled:opacity-50"
+                            >
+                              {publishingId === listing.id ? (
+                                <>
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Publishing...
+                                </>
+                              ) : (
+                                <>Go Live</>
+                              )}
+                            </button>
+                            <Link
+                              to="/listing/$id"
+                              params={{ id: listing.id }}
+                              className="inline-flex items-center justify-center gap-1.5 rounded-md border border-border px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:bg-muted transition-all cursor-pointer text-center"
+                            >
+                              Details
+                            </Link>
+                          </>
+                        ) : (
+                          <Link
+                            to="/listing/$id"
+                            params={{ id: listing.id }}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-sm text-center"
+                          >
+                            Track Status <ChevronRight className="h-4 w-4" />
+                          </Link>
+                        )}
                       </div>
                     </div>
                   );

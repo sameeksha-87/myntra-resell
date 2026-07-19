@@ -25,6 +25,7 @@ import {
   createListingDraft,
   uploadListingMedia,
   submitForVerification,
+  publishListing,
 } from "@/integrations/supabase/actions.server";
 
 export const Route = createFileRoute("/resell/$orderId")({
@@ -232,7 +233,7 @@ function ResellFlow() {
       setVerifying(false);
       if (verifResult.success) {
         setVerified(true);
-        toast.success("AI Verification passed! Listing is now live.");
+        toast.success("AI Verification passed! Click 'Go Live' to publish it.");
       } else {
         setVerified(false);
         setVerifFailed(true);
@@ -405,7 +406,19 @@ function ResellFlow() {
               verified={verified}
               failed={verifFailed}
               reason={verifReason}
-              onContinue={() => setStep(2)}
+              onContinue={async () => {
+                if (!listingId) return;
+                try {
+                  setVerifying(true);
+                  await publishListing({ data: { listingId } });
+                  setStep(2);
+                  toast.success("Your listing is now live on the marketplace!");
+                } catch (err: any) {
+                  toast.error(err.message || "Failed to publish listing");
+                } finally {
+                  setVerifying(false);
+                }
+              }}
               onBack={() => {
                 setStep(0); // Let them retake photos if verification failed
                 setVerified(false);

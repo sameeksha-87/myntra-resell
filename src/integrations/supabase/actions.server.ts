@@ -466,13 +466,12 @@ export const submitForVerification = createServerFn({ method: "POST" })
     const overallPassed = blurPassed && anglePassed && duplicatePassed && clipPassed;
 
     if (overallPassed) {
-      // Transition to live
+      // Transition to verified (not live yet - user must click go live)
       await supabaseAdmin
         .from("listings")
         .update({
-          status: "live",
+          status: "verified",
           verification_disposition: "approved",
-          publish_timestamp: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq("id", listingId);
@@ -489,14 +488,14 @@ export const submitForVerification = createServerFn({ method: "POST" })
       await supabaseAdmin.from("listing_events").insert({
         listing_id: listingId,
         sequence: 3,
-        event_type: "listing_approved_live",
+        event_type: "listing_approved",
         from_state: "verification_pending",
-        to_state: "live",
+        to_state: "verified",
         actor_type: "system",
         payload: { runId },
       });
 
-      return { status: "live", success: true };
+      return { status: "verified", success: true };
     } else {
       // Transition to verification_failed
       const reason = !blurPassed
@@ -537,6 +536,59 @@ export const submitForVerification = createServerFn({ method: "POST" })
 
       return { status: "verification_failed", success: false, reason };
     }
+  });
+
+// 4b. Go Live (Publish Listing)
+export const publishListing = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    z.object({
+      listingId: z.string().uuid(),
+    }),
+  )
+  .handler(async ({ context, data }) => {
+    const { userId } = context;
+    const { listingId } = data;
+
+    // Check ownership of listing
+    const { data: listing, error: listingErr } = await supabaseAdmin
+      .from("listings")
+      .select("seller_id, status")
+      .eq("id", listingId)
+      .single();
+
+    if (listingErr || !listing) throw new Error("Listing not found");
+    if (listing.seller_id !== userId) throw new Error("Unauthorized");
+
+    // Status must be verified to go live
+    if (listing.status !== "verified") {
+      throw new Error(`Listing cannot go live from status: ${listing.status}`);
+    }
+
+    // Update status to live
+    const { error: updateErr } = await supabaseAdmin
+      .from("listings")
+      .update({
+        status: "live",
+        publish_timestamp: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", listingId);
+
+    if (updateErr) throw new Error(`Failed to publish listing: ${updateErr.message}`);
+
+    // Add Listing Event
+    await supabaseAdmin.from("listing_events").insert({
+      listing_id: listingId,
+      sequence: 4,
+      event_type: "listing_published",
+      from_state: "verified",
+      to_state: "live",
+      actor_type: "seller",
+      actor_id: userId,
+    });
+
+    return { success: true };
   });
 
 // 5. Checkout validation & place order
