@@ -946,6 +946,10 @@ function VerifyStep({ verifying, verified, failed, reason, onContinue, onBack }:
   const checks = [
     { label: "Image quality gate", note: "Blur / lighting / resolution check" },
     { label: "Category & brand match", note: "Against original Myntra purchase record" },
+    {
+      label: "CLIP image similarity match",
+      note: "Compare uploaded photos with purchased catalog photo",
+    },
     { label: "Duplicate image detection", note: "Prevent stock photo or scraped list" },
     { label: "Confidence scoring", note: "Durable validation audit complete" },
   ];

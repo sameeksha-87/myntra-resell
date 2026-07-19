@@ -3,6 +3,46 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "./auth-middleware";
 import { supabaseAdmin } from "./client.server";
 import { z } from "zod";
+import { exec } from "child_process";
+import { promisify } from "util";
+import path from "path";
+
+const execAsync = promisify(exec);
+
+async function runClipVerification(
+  originalUrl: string,
+  uploadedUrl: string,
+): Promise<{ score: number; verified: boolean; decision: string }> {
+  try {
+    const workspaceRoot = process.cwd();
+    const pythonPath = path.join(workspaceRoot, "venv", "bin", "python");
+    const scriptPath = path.join(workspaceRoot, "verify_clip_service.py");
+
+    const command = `"${pythonPath}" "${scriptPath}" "${originalUrl.replace(/"/g, '\\"')}" "${uploadedUrl.replace(/"/g, '\\"')}"`;
+    console.log("Running CLIP command:", command);
+
+    const { stdout } = await execAsync(command);
+    console.log("CLIP stdout:", stdout);
+
+    const result = JSON.parse(stdout.trim());
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
+    return {
+      score: result.score || 0.0,
+      verified: result.verified || false,
+      decision: result.decision || "failed",
+    };
+  } catch (err: any) {
+    console.error("CLIP verification error:", err);
+    return {
+      score: 0.0,
+      verified: false,
+      decision: "error: " + err.message,
+    };
+  }
+}
 
 // Helper to check if a user has a specific role on the server
 async function checkUserRole(userId: string, role: "admin" | "inspector"): Promise<boolean> {
@@ -335,6 +375,54 @@ export const submitForVerification = createServerFn({ method: "POST" })
       status: "running",
     });
 
+    // Fetch original purchase image
+    const { data: item } = await supabaseAdmin
+      .from("myntra_order_items")
+      .select("image")
+      .eq("id", listing.source_order_item_id)
+      .single();
+
+    const originalImageUrl =
+      item?.image ||
+      "https://images.unsplash.com/photo-1548883354-7622d03aca27?auto=format&fit=crop&q=80&w=400";
+
+    // Fetch uploaded media (specifically the 'top' angle)
+    const { data: mediaRows } = await supabaseAdmin
+      .from("listing_media")
+      .select("storage_key")
+      .eq("listing_id", listingId)
+      .eq("angle", "top")
+      .maybeSingle();
+
+    let storageKey = mediaRows?.storage_key;
+    if (!storageKey) {
+      const { data: anyMedia } = await supabaseAdmin
+        .from("listing_media")
+        .select("storage_key")
+        .eq("listing_id", listingId)
+        .limit(1);
+      if (anyMedia && anyMedia.length > 0) {
+        storageKey = anyMedia[0].storage_key;
+      }
+    }
+
+    const supabaseUrl = process.env.SUPABASE_URL || "https://kivsgplxeyhaxzuhfquk.supabase.co";
+    const uploadedImageUrl = storageKey
+      ? `${supabaseUrl}/storage/v1/object/public/resell-photos/${storageKey}`
+      : "";
+
+    // Run CLIP verification comparison
+    let clipPassed = true;
+    let clipScore = 1.0;
+    let clipDecision = "verified";
+
+    if (uploadedImageUrl) {
+      const clipResult = await runClipVerification(originalImageUrl, uploadedImageUrl);
+      clipScore = clipResult.score;
+      clipDecision = clipResult.decision;
+      clipPassed = clipResult.verified;
+    }
+
     // Simulated checks
     const blurPassed = !simBlur;
     const anglePassed = !simWrongAngle;
@@ -365,9 +453,17 @@ export const submitForVerification = createServerFn({ method: "POST" })
         threshold: 0.9,
         evidence: { similarity_to_stock_photos: 0.05 },
       },
+      {
+        verification_run_id: runId,
+        check_type: "clip_similarity_check",
+        status: clipPassed ? "passed" : "failed",
+        score: clipScore,
+        threshold: 0.75,
+        evidence: { clip_similarity: clipScore, decision: clipDecision },
+      },
     ]);
 
-    const overallPassed = blurPassed && anglePassed && duplicatePassed;
+    const overallPassed = blurPassed && anglePassed && duplicatePassed && clipPassed;
 
     if (overallPassed) {
       // Transition to live
@@ -403,7 +499,13 @@ export const submitForVerification = createServerFn({ method: "POST" })
       return { status: "live", success: true };
     } else {
       // Transition to verification_failed
-      const reason = !blurPassed ? "blurry_images" : "incorrect_angles";
+      const reason = !blurPassed
+        ? "blurry_images"
+        : !anglePassed
+          ? "incorrect_angles"
+          : !clipPassed
+            ? "different_product"
+            : "duplicate_images";
       await supabaseAdmin
         .from("listings")
         .update({
