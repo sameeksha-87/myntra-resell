@@ -14,14 +14,6 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthProvider } from "@/lib/auth-context";
 import { Toaster } from "@/components/ui/sonner";
 
-import { useState } from "react";
-import { useAuth } from "@/lib/auth-context";
-import { setSimulatedRole } from "@/integrations/supabase/actions.server";
-import { Sliders, Shield } from "lucide-react";
-import { toast } from "sonner";
-
-import { supabase } from "@/integrations/supabase/client";
-
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -145,122 +137,11 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
-function RoleSwitcher() {
-  const { user } = useAuth();
-  const signOut = () => supabase.auth.signOut();
-  const [role, setRole] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("simulated_role") || "seller";
-    }
-    return "seller";
-  });
-  const [busy, setBusy] = useState(false);
-  const router = useRouter();
-
-  const handleRoleChange = async (newRole: string) => {
-    if (!user) {
-      if (newRole !== "guest") {
-        toast.info("Please sign in first to switch roles");
-        router.navigate({ to: "/auth" });
-        return;
-      }
-      return;
-    }
-
-    setBusy(true);
-    try {
-      if (newRole === "guest") {
-        await signOut();
-        setRole("guest");
-        localStorage.setItem("simulated_role", "guest");
-        router.navigate({ to: "/" });
-      } else {
-        await setSimulatedRole({ data: { role: newRole as any } });
-        setRole(newRole);
-        localStorage.setItem("simulated_role", newRole);
-        toast.success(`Active database role switched to: ${newRole.toUpperCase()}`);
-        router.invalidate();
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to switch role");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // Sync role on load if logged in
-  useEffect(() => {
-    if (user && role !== "guest") {
-      setSimulatedRole({ data: { role: role as any } }).catch(console.error);
-    }
-  }, [user]);
-
-  return (
-    <div className="bg-zinc-900 text-zinc-100 text-xs py-2.5 px-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b border-zinc-800">
-      <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-primary">
-        <Sliders className="h-3.5 w-3.5 animate-pulse text-primary" /> ReSell Hackathon Simulator
-      </div>
-
-      <div className="flex flex-wrap items-center gap-4">
-        {user ? (
-          <span className="text-[10px] text-zinc-400">
-            Signed in: <span className="text-zinc-200 font-bold">{user.email}</span>
-          </span>
-        ) : (
-          <span className="text-[10px] text-warning font-semibold animate-pulse">
-            Signed out / Guest mode
-          </span>
-        )}
-
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-zinc-400 uppercase font-semibold">Active Role:</span>
-          <div className="flex rounded overflow-hidden border border-zinc-700 bg-zinc-800">
-            {["buyer", "seller", "inspector", "admin"].map((r) => (
-              <button
-                key={r}
-                disabled={busy}
-                onClick={() => handleRoleChange(r)}
-                className={`px-2.5 py-1 text-[10px] uppercase font-bold transition-all cursor-pointer ${
-                  role === r && user
-                    ? "bg-primary text-primary-foreground font-black"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-750"
-                }`}
-              >
-                {r}
-              </button>
-            ))}
-            <button
-              onClick={() => handleRoleChange("guest")}
-              className={`px-2.5 py-1 text-[10px] uppercase font-bold transition-all cursor-pointer ${
-                !user || role === "guest"
-                  ? "bg-zinc-700 text-zinc-200 font-black"
-                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-750"
-              }`}
-            >
-              Sign Out
-            </button>
-          </div>
-        </div>
-
-        {user && (role === "admin" || role === "inspector") && (
-          <Link
-            to="/admin"
-            className="inline-flex items-center gap-1 text-[10px] bg-warning text-warning-foreground px-2 py-0.5 rounded font-black uppercase tracking-wider hover:opacity-90 transition"
-          >
-            <Shield className="h-3 w-3" /> Ops Console
-          </Link>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <RoleSwitcher />
         <Outlet />
         <Toaster richColors position="top-right" />
       </AuthProvider>

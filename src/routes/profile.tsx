@@ -132,7 +132,7 @@ function ProfilePage() {
           <h1 className="text-2xl font-black">My Profile</h1>
           <p className="mt-1 text-sm text-muted-foreground">Update how you appear on ReSell.</p>
 
-          <div className="mt-4 grid gap-3 grid-cols-2 md:grid-cols-4">
+          <div className="mt-4 grid gap-3 grid-cols-1 sm:grid-cols-3">
             <Stat label="Active listings" value={listingCount ?? "—"} />
             <Stat
               label="Member since"
@@ -141,7 +141,6 @@ function ProfilePage() {
                 year: "numeric",
               })}
             />
-            <Stat label="Seller score" value="4.8 ★" />
             <Stat
               label="Myntra Coins"
               value={myntraCoins !== null ? `🪙 ${myntraCoins}` : "—"}
