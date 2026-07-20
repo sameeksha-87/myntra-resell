@@ -43,9 +43,7 @@ async function run() {
   }
 
   console.log(`Found ${listings?.length || 0} total listings.`);
-  const matching = (listings || []).filter((l: any) =>
-    l.id.toLowerCase().startsWith("aed40eeb")
-  );
+  const matching = (listings || []).filter((l: any) => l.id.toLowerCase().startsWith("aed40eeb"));
 
   if (matching.length > 0) {
     for (const l of matching) {
@@ -58,7 +56,9 @@ async function run() {
       }
     }
   } else {
-    console.log("Listing AED40EEB not found directly. Deleting all verification_pending & verification_failed listings...");
+    console.log(
+      "Listing AED40EEB not found directly. Deleting all verification_pending & verification_failed listings...",
+    );
     const { data: pending, error: pendErr } = await supabase
       .from("listings")
       .delete()

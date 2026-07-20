@@ -3,14 +3,18 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "./auth-middleware";
 import { supabaseAdmin } from "./client.server";
 import { z } from "zod";
-import { exec } from "child_process";
+import { exec, spawn } from "child_process";
 import { promisify } from "util";
 import path from "path";
 import fs from "fs";
 
 const execAsync = promisify(exec);
 
-async function prepareImageSource(src: string, filename: string, workspaceRoot: string): Promise<{ path: string; isTemp: boolean }> {
+async function prepareImageSource(
+  src: string,
+  filename: string,
+  workspaceRoot: string,
+): Promise<{ path: string; isTemp: boolean }> {
   const scratchDir = path.join(workspaceRoot, "scratch");
   if (!fs.existsSync(scratchDir)) {
     fs.mkdirSync(scratchDir, { recursive: true });
@@ -39,9 +43,36 @@ async function prepareImageSource(src: string, filename: string, workspaceRoot: 
   return { path: src, isTemp: false };
 }
 
+async function ensureDaemonRunning(pythonPath: string, scriptPath: string): Promise<boolean> {
+  try {
+    const res = await fetch("http://localhost:8001/ping", { signal: AbortSignal.timeout(500) });
+    if (res.ok) {
+      return true;
+    }
+  } catch (e) {
+    console.log(
+      "🤖 Verification daemon down. Spawning persistent background service on http://localhost:8001...",
+    );
+    try {
+      const child = spawn(pythonPath, [scriptPath, "--server", "--port", "8001"], {
+        detached: true,
+        stdio: "ignore",
+      });
+      child.unref();
+      // Wait 3.5 seconds for weights (YOLO, DINOv2, rembg, EasyOCR) to preload into RAM
+      await new Promise((resolve) => setTimeout(resolve, 3500));
+      return true;
+    } catch (err) {
+      console.error("Failed to spawn persistent daemon service:", err);
+    }
+  }
+  return false;
+}
+
 async function runClipVerification(
   originalUrl: string,
   uploadedUrl: string,
+  brand?: string,
 ): Promise<{ score: number; verified: boolean; decision: string }> {
   const workspaceRoot = process.cwd();
   let origFile: { path: string; isTemp: boolean } | null = null;
@@ -61,39 +92,79 @@ async function runClipVerification(
     origFile = await prepareImageSource(originalUrl, `temp_orig_${now}.jpg`, workspaceRoot);
     uplFile = await prepareImageSource(uploadedUrl, `temp_upl_${now}.jpg`, workspaceRoot);
 
-    const command = `"${pythonPath}" "${scriptPath}" "${origFile.path.replace(/"/g, '\\"')}" "${uplFile.path.replace(/"/g, '\\"')}"`;
-    console.log("Running CLIP command with temp paths:", origFile.path, uplFile.path);
+    let result: any = null;
+    const daemonReady = await ensureDaemonRunning(pythonPath, scriptPath);
 
-    const { stdout } = await execAsync(command, {
-      timeout: 90000,
-      env: { ...process.env, HF_HUB_OFFLINE: "1", TRANSFORMERS_OFFLINE: "1", HF_HUB_DISABLE_SYMLINKS_WARNING: "1" },
-    });
+    if (daemonReady) {
+      try {
+        console.log("⚡ Contacting persistent verification server...");
+        const response = await fetch("http://localhost:8001/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            original_image: origFile.path,
+            uploaded_image: uplFile.path,
+            brand: brand || "",
+          }),
+          signal: AbortSignal.timeout(15000), // 15s timeout
+        });
 
-    const result = JSON.parse(stdout.trim());
+        if (response.ok) {
+          result = await response.json();
+          console.log("⚡ Response received from verification daemon.");
+        } else {
+          console.warn("Daemon returned error status:", response.status);
+        }
+      } catch (err) {
+        console.warn("Failed to communicate with daemon, falling back to CLI run:", err);
+      }
+    }
+
+    if (!result) {
+      const brandArg = brand ? ` --brand "${brand.replace(/"/g, '\\"')}"` : "";
+      const command = `"${pythonPath}" "${scriptPath}" "${origFile.path.replace(/"/g, '\\"')}" "${uplFile.path.replace(/"/g, '\\"')}"${brandArg}`;
+      console.log("Running fallback one-shot CLIP command:", command);
+
+      const { stdout } = await execAsync(command, {
+        timeout: 90000,
+        env: {
+          ...process.env,
+          HF_HUB_OFFLINE: "1",
+          TRANSFORMERS_OFFLINE: "1",
+          HF_HUB_DISABLE_SYMLINKS_WARNING: "1",
+        },
+      });
+      result = JSON.parse(stdout.trim());
+    }
+
     if (result.error) {
       throw new Error(result.error);
     }
 
-    const scorePct = ((result.score || 0) * 100).toFixed(1);
-    const clipPct = result.fashion_clip_score ? (result.fashion_clip_score * 100).toFixed(1) + "%" : "N/A";
-    const orbPct = result.orb_score ? (result.orb_score * 100).toFixed(1) + "%" : "N/A";
+    const finalScore = result.final_score !== undefined ? result.final_score : (result.score || 0.0);
+    const scorePct = (finalScore * 100).toFixed(1);
+    const embeddingPct = result.embedding_score
+      ? (result.embedding_score * 100).toFixed(1) + "%"
+      : "N/A";
+    const colorPct = result.color_score ? (result.color_score * 100).toFixed(1) + "%" : "N/A";
 
     console.log("\n=======================================================");
-    console.log("📊 AI PRODUCT VERIFICATION RESULT:");
-    console.log(`   Final Weighted Score : ${scorePct}% (${result.score})`);
-    console.log(`   FashionCLIP Score    : ${clipPct}`);
-    console.log(`   ORB Feature Score    : ${orbPct}`);
-    console.log(`   Decision             : ${String(result.decision).toUpperCase()}`);
-    console.log(`   Verified             : ${result.verified ? "✅ PASSED" : "❌ REJECTED"}`);
+    console.log("📊 AI FASHION PRODUCT VERIFICATION RESULT:");
+    console.log(`   Final Weighted Score   : ${scorePct}% (${finalScore})`);
+    console.log(`   Visual Embedding Match : ${embeddingPct}`);
+    console.log(`   HSV Color Match        : ${colorPct}`);
+    console.log(`   OCR Brand Tag Score    : ${result.brand_score}`);
+    console.log(`   Decision               : ${String(result.decision).toUpperCase()}`);
+    console.log(`   Verified               : ${result.verified ? "✅ PASSED" : "❌ REJECTED"}`);
     console.log("=======================================================\n");
 
     return {
-      score: result.score || 0.0,
+      score: finalScore,
       verified: result.verified || false,
       decision: result.decision || "failed",
     };
   } catch (err: any) {
-    console.error("CLIP verification error:", err);
+    console.error("Verification engine execution error:", err);
     return {
       score: 0.0,
       verified: false,
@@ -442,12 +513,14 @@ export const submitForVerification = createServerFn({ method: "POST" })
       status: "running",
     });
 
-    // Fetch original purchase image
+    // Fetch original purchase image and brand name
     const { data: item } = await supabaseAdmin
       .from("myntra_order_items")
-      .select("image")
+      .select("image, brand:brands(name)")
       .eq("id", listing.source_order_item_id)
       .single();
+
+    const brandName = item?.brand?.name || "";
 
     const originalImageUrl =
       catalogImageUrl ||
@@ -482,13 +555,13 @@ export const submitForVerification = createServerFn({ method: "POST" })
         : "";
     }
 
-    // Run CLIP & YOLO verification comparison
+    // Run verification comparison
     let clipPassed = false;
     let clipScore = 0.0;
     let clipDecision = "failed";
 
     if (uploadTarget) {
-      const clipResult = await runClipVerification(originalImageUrl, uploadTarget);
+      const clipResult = await runClipVerification(originalImageUrl, uploadTarget, brandName);
       clipScore = clipResult.score;
       clipDecision = clipResult.decision;
       clipPassed = clipResult.verified;
@@ -529,7 +602,7 @@ export const submitForVerification = createServerFn({ method: "POST" })
         check_type: "clip_similarity_check",
         status: clipPassed ? "passed" : "failed",
         score: clipScore,
-        threshold: 0.50,
+        threshold: 0.5,
         evidence: { clip_similarity: clipScore, decision: clipDecision },
       },
     ]);

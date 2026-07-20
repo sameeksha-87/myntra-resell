@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.SUPABASE_URL || "",
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ""
+  process.env.SUPABASE_SERVICE_ROLE_KEY || "",
 );
 
 async function main() {
@@ -11,14 +11,16 @@ async function main() {
 
   const { data, error } = await supabase
     .from("listings")
-    .select(`
+    .select(
+      `
       id,
       title,
       myntra_order_items!inner (
         id,
         category_id
       )
-    `)
+    `,
+    )
     .eq("myntra_order_items.category_id", targetCategoryId);
 
   if (error) {

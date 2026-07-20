@@ -8,28 +8,43 @@ from ultralytics import YOLO
 # -----------------------------
 # 1. Load Fashion YOLO Model
 # -----------------------------
-print("📦 Loading Fashion YOLO model (best.pt)...")
-yolo_model = YOLO("best.pt")
+print("📦 Loading Fashion YOLO model...")
+try:
+    if os.path.exists("best.pt"):
+        yolo_model = YOLO("best.pt")
+        print("📦 Successfully loaded custom best.pt weights.")
+    else:
+        print("⚠️ best.pt not found, falling back to pre-trained yolov8n.pt...")
+        yolo_model = YOLO("yolov8n.pt")
+except Exception as e:
+    print(f"⚠️ Failed to initialize YOLO model: {e}")
+    yolo_model = None
 
 def crop_clothing(image_path):
     img = Image.open(image_path).convert("RGB")
-    results = yolo_model(img, verbose=False)
-    if len(results) > 0 and results[0].boxes is not None and len(results[0].boxes) > 0:
-        boxes = results[0].boxes
-        confidences = boxes.conf
-        best_idx = torch.argmax(confidences).item()
-        box = boxes.xyxy[best_idx].cpu().numpy()
-        x1, y1, x2, y2 = map(int, box)
-        
-        w, h = img.size
-        x1 = max(0, min(x1, w - 1))
-        y1 = max(0, min(y1, h - 1))
-        x2 = max(x1 + 1, min(x2, w))
-        y2 = max(y1 + 1, min(y2, h))
-        
-        cropped = img.crop((x1, y1, x2, y2))
-        print(f"✂️ Cropped clothing box {box.tolist()} for {image_path}")
-        return cropped
+    if yolo_model is None:
+        print(f"⚠️ YOLO model is unavailable, using full image for {image_path}.")
+        return img
+    try:
+        results = yolo_model(img, verbose=False)
+        if len(results) > 0 and results[0].boxes is not None and len(results[0].boxes) > 0:
+            boxes = results[0].boxes
+            confidences = boxes.conf
+            best_idx = torch.argmax(confidences).item()
+            box = boxes.xyxy[best_idx].cpu().numpy()
+            x1, y1, x2, y2 = map(int, box)
+            
+            w, h = img.size
+            x1 = max(0, min(x1, w - 1))
+            y1 = max(0, min(y1, h - 1))
+            x2 = max(x1 + 1, min(x2, w))
+            y2 = max(y1 + 1, min(y2, h))
+            
+            cropped = img.crop((x1, y1, x2, y2))
+            print(f"✂️ Cropped clothing box {box.tolist()} for {image_path}")
+            return cropped
+    except Exception as e:
+        print(f"⚠️ YOLO inference error: {e}")
     print(f"⚠️ No clothing detected for {image_path}, using full image.")
     return img
 
