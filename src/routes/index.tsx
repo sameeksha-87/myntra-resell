@@ -11,14 +11,26 @@ export const Route = createFileRoute("/")({
 });
 
 const categories = [
-  { label: "Dresses", img: "https://picsum.photos/seed/cat-dress/300/300" },
-  { label: "Sneakers", img: "https://picsum.photos/seed/cat-shoe/300/300" },
-  { label: "Outerwear", img: "https://picsum.photos/seed/cat-jacket/300/300" },
-  { label: "Denim", img: "https://picsum.photos/seed/cat-jeans/300/300" },
-  { label: "Blazers", img: "https://picsum.photos/seed/cat-blazer/300/300" },
-  { label: "Bags", img: "https://picsum.photos/seed/cat-bag/300/300" },
-  { label: "Luxury", img: "https://picsum.photos/seed/cat-luxury/300/300" },
-  { label: "Kids", img: "https://picsum.photos/seed/cat-kids/300/300" },
+  {
+    id: "5f163d0f-8e56-4003-b58e-370699d792df",
+    label: "Shoes",
+    img: "/shoes.png",
+  },
+  {
+    id: "b0b2c21b-4b96-4004-a849-f0176da0867c",
+    label: "Bags",
+    img: "/bags.png",
+  },
+  {
+    id: "f17caa0a-b689-4d1c-a434-34abfc366c0f",
+    label: "Tops",
+    img: "/tops.png",
+  },
+  {
+    id: "d00000e2-675e-41a5-8220-d40b9ddf67d0",
+    label: "Dresses",
+    img: "/dresses.png",
+  },
 ];
 
 function Index() {
@@ -49,8 +61,8 @@ function Index() {
       });
   }, [selectedCategory, priceSort, searchQuery]);
 
-  const handleCategoryClick = (catName: string) => {
-    setSelectedCategory(selectedCategory === catName ? undefined : catName);
+  const handleCategoryClick = (catId: string) => {
+    setSelectedCategory(selectedCategory === catId ? undefined : catId);
     document.getElementById("feed")?.scrollIntoView({ behavior: "smooth" });
   };
 
@@ -141,20 +153,20 @@ function Index() {
         <h2 className="text-center text-2xl font-black uppercase tracking-wider">
           Shop by Category
         </h2>
-        <div className="mt-6 grid grid-cols-4 gap-4 md:grid-cols-8">
+        <div className="mt-6 grid grid-cols-4 gap-4 max-w-xl mx-auto">
           {categories.map((c) => (
             <button
               key={c.label}
-              onClick={() => handleCategoryClick(c.label)}
-              className={`group flex flex-col items-center cursor-pointer transition-all duration-200 ${selectedCategory === c.label ? "scale-105" : ""}`}
+              onClick={() => handleCategoryClick(c.id)}
+              className={`group flex flex-col items-center cursor-pointer transition-all duration-200 ${selectedCategory === c.id ? "scale-105" : ""}`}
             >
               <div
-                className={`aspect-square w-20 overflow-hidden rounded-full border-2 ${selectedCategory === c.label ? "border-primary shadow-lg scale-105" : "border-transparent group-hover:border-primary/50"}`}
+                className={`aspect-square w-20 overflow-hidden rounded-full border-2 ${selectedCategory === c.id ? "border-primary shadow-lg scale-105" : "border-transparent group-hover:border-primary/50"}`}
               >
                 <img src={c.img} alt={c.label} className="h-full w-full object-cover" />
               </div>
               <span
-                className={`mt-2 text-xs font-bold uppercase ${selectedCategory === c.label ? "text-primary font-black" : "text-foreground"}`}
+                className={`mt-2 text-xs font-bold uppercase ${selectedCategory === c.id ? "text-primary font-black" : "text-foreground"}`}
               >
                 {c.label}
               </span>
@@ -224,7 +236,7 @@ function Index() {
         {selectedCategory && (
           <div className="mt-3 flex items-center gap-2 text-xs">
             <span className="bg-primary/10 text-primary px-2.5 py-1 rounded-full font-bold uppercase flex items-center gap-1.5">
-              Category: {selectedCategory}
+              Category: {categories.find((c) => c.id === selectedCategory)?.label || "Selected"}
               <button
                 onClick={() => setSelectedCategory(undefined)}
                 className="hover:text-primary-foreground hover:bg-primary rounded-full p-0.5"

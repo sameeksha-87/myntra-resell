@@ -1524,10 +1524,33 @@ export const fetchListings = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { category, brand, size, search, priceSort } = data;
 
-    let query = supabaseAdmin
-      .from("listings")
-      .select(
-        `
+    const querySelect = category
+      ? `
+        id,
+        title,
+        brand,
+        category,
+        size,
+        current_price_paise,
+        declared_grade,
+        confirmed_grade,
+        status,
+        seller_id,
+        source_order_item_id,
+        created_at,
+        myntra_order_items!inner (
+          original_price_paise,
+          category_id,
+          myntra_orders (
+            delivered_at
+          )
+        ),
+        listing_media (
+          storage_key,
+          angle
+        )
+      `
+      : `
         id,
         title,
         brand,
@@ -1542,6 +1565,7 @@ export const fetchListings = createServerFn({ method: "GET" })
         created_at,
         myntra_order_items (
           original_price_paise,
+          category_id,
           myntra_orders (
             delivered_at
           )
@@ -1550,11 +1574,13 @@ export const fetchListings = createServerFn({ method: "GET" })
           storage_key,
           angle
         )
-      `,
-      )
-      .eq("status", "live");
+      `;
 
-    if (category) query = query.eq("category", category);
+    let query = supabaseAdmin.from("listings").select(querySelect).eq("status", "live");
+
+    if (category) {
+      query = query.eq("myntra_order_items.category_id", category);
+    }
     if (brand) query = query.eq("brand", brand);
     if (size) query = query.eq("size", size);
     if (search) query = query.ilike("title", `%${search}%`);
