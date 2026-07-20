@@ -3,7 +3,7 @@ import json
 import urllib.request
 import io
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 import open_clip
 import torch
 import torch.nn.functional as F
@@ -50,8 +50,11 @@ def segment_and_crop_clothing(img: Image.Image) -> Image.Image:
         clothing_classes = [1, 3, 4, 5, 6, 7, 8, 9, 11, 12, 18, 19]
         clothing_mask = np.isin(pred_seg, clothing_classes)
 
-        if not np.any(clothing_mask):
-            return img  # Fallback if no clothes are detected
+        # Enforce minimum clothing coverage (e.g. at least 5% of the image) to avoid cropping to tiny noise pixels
+        mask_pixels = np.sum(clothing_mask)
+        total_pixels = w * h
+        if mask_pixels < (total_pixels * 0.05):
+            return img  # Fallback if no substantial clothing is detected
 
         # Mask out non-clothing background pixels (fill with white, RGB = 255)
         img_np = np.array(img)
@@ -87,9 +90,12 @@ def load_image(src):
                 headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
             )
             with urllib.request.urlopen(req) as response:
-                return Image.open(io.BytesIO(response.read())).convert('RGB')
+                img = Image.open(io.BytesIO(response.read()))
         else:
-            return Image.open(src).convert('RGB')
+            img = Image.open(src)
+            
+        img = ImageOps.exif_transpose(img)
+        return img.convert('RGB')
     except Exception as e:
         print(json.dumps({"error": f"Failed to load image {src}: {str(e)}", "score": 0.0, "verified": False}))
         sys.exit(1)
