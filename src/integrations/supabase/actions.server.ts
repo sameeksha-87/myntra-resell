@@ -6,28 +6,86 @@ import { z } from "zod";
 import { exec } from "child_process";
 import { promisify } from "util";
 import path from "path";
+import fs from "fs";
 
 const execAsync = promisify(exec);
+
+async function prepareImageSource(src: string, filename: string, workspaceRoot: string): Promise<{ path: string; isTemp: boolean }> {
+  const scratchDir = path.join(workspaceRoot, "scratch");
+  if (!fs.existsSync(scratchDir)) {
+    fs.mkdirSync(scratchDir, { recursive: true });
+  }
+
+  if (src.startsWith("data:image")) {
+    const base64Data = src.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
+    const tempFilePath = path.join(scratchDir, filename);
+    await fs.promises.writeFile(tempFilePath, buffer);
+    return { path: tempFilePath, isTemp: true };
+  } else if (src.startsWith("http://") || src.startsWith("https://")) {
+    try {
+      const res = await fetch(src);
+      if (res.ok) {
+        const arrayBuffer = await res.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const tempFilePath = path.join(scratchDir, filename);
+        await fs.promises.writeFile(tempFilePath, buffer);
+        return { path: tempFilePath, isTemp: true };
+      }
+    } catch (e) {
+      console.error("Failed to pre-download remote image:", e);
+    }
+  }
+  return { path: src, isTemp: false };
+}
 
 async function runClipVerification(
   originalUrl: string,
   uploadedUrl: string,
 ): Promise<{ score: number; verified: boolean; decision: string }> {
+  const workspaceRoot = process.cwd();
+  let origFile: { path: string; isTemp: boolean } | null = null;
+  let uplFile: { path: string; isTemp: boolean } | null = null;
+
   try {
-    const workspaceRoot = process.cwd();
-    const pythonPath = path.join(workspaceRoot, "venv", "bin", "python");
+    const venvBinPython = path.join(workspaceRoot, "venv", "bin", "python");
+    const venvScriptsPython = path.join(workspaceRoot, "venv", "Scripts", "python.exe");
+    const pythonPath = fs.existsSync(venvBinPython)
+      ? venvBinPython
+      : fs.existsSync(venvScriptsPython)
+        ? venvScriptsPython
+        : "python";
     const scriptPath = path.join(workspaceRoot, "verify_clip_service.py");
 
-    const command = `"${pythonPath}" "${scriptPath}" "${originalUrl.replace(/"/g, '\\"')}" "${uploadedUrl.replace(/"/g, '\\"')}"`;
-    console.log("Running CLIP command:", command);
+    const now = Date.now();
+    origFile = await prepareImageSource(originalUrl, `temp_orig_${now}.jpg`, workspaceRoot);
+    uplFile = await prepareImageSource(uploadedUrl, `temp_upl_${now}.jpg`, workspaceRoot);
 
-    const { stdout } = await execAsync(command);
-    console.log("CLIP stdout:", stdout);
+    const command = `"${pythonPath}" "${scriptPath}" "${origFile.path.replace(/"/g, '\\"')}" "${uplFile.path.replace(/"/g, '\\"')}"`;
+    console.log("Running CLIP command with temp paths:", origFile.path, uplFile.path);
+
+    const { stdout } = await execAsync(command, {
+      timeout: 90000,
+      env: { ...process.env, HF_HUB_OFFLINE: "1", TRANSFORMERS_OFFLINE: "1", HF_HUB_DISABLE_SYMLINKS_WARNING: "1" },
+    });
 
     const result = JSON.parse(stdout.trim());
     if (result.error) {
       throw new Error(result.error);
     }
+
+    const scorePct = ((result.score || 0) * 100).toFixed(1);
+    const clipPct = result.fashion_clip_score ? (result.fashion_clip_score * 100).toFixed(1) + "%" : "N/A";
+    const orbPct = result.orb_score ? (result.orb_score * 100).toFixed(1) + "%" : "N/A";
+
+    console.log("\n=======================================================");
+    console.log("📊 AI PRODUCT VERIFICATION RESULT:");
+    console.log(`   Final Weighted Score : ${scorePct}% (${result.score})`);
+    console.log(`   FashionCLIP Score    : ${clipPct}`);
+    console.log(`   ORB Feature Score    : ${orbPct}`);
+    console.log(`   Decision             : ${String(result.decision).toUpperCase()}`);
+    console.log(`   Verified             : ${result.verified ? "✅ PASSED" : "❌ REJECTED"}`);
+    console.log("=======================================================\n");
 
     return {
       score: result.score || 0.0,
@@ -41,6 +99,13 @@ async function runClipVerification(
       verified: false,
       decision: "error: " + err.message,
     };
+  } finally {
+    if (origFile?.isTemp && fs.existsSync(origFile.path)) {
+      fs.promises.unlink(origFile.path).catch(() => {});
+    }
+    if (uplFile?.isTemp && fs.existsSync(uplFile.path)) {
+      fs.promises.unlink(uplFile.path).catch(() => {});
+    }
   }
 }
 
@@ -334,11 +399,13 @@ export const submitForVerification = createServerFn({ method: "POST" })
       listingId: z.string().uuid(),
       simBlur: z.boolean().default(false),
       simWrongAngle: z.boolean().default(false),
+      photoBase64: z.string().optional(),
+      catalogImageUrl: z.string().optional(),
     }),
   )
   .handler(async ({ context, data }) => {
     const { userId } = context;
-    const { listingId, simBlur, simWrongAngle } = data;
+    const { listingId, simBlur, simWrongAngle, photoBase64, catalogImageUrl } = data;
 
     // Check ownership of listing
     const { data: listing, error: listingErr } = await supabaseAdmin
@@ -383,53 +450,48 @@ export const submitForVerification = createServerFn({ method: "POST" })
       .single();
 
     const originalImageUrl =
+      catalogImageUrl ||
       item?.image ||
       "https://images.unsplash.com/photo-1548883354-7622d03aca27?auto=format&fit=crop&q=80&w=400";
 
-    // Fetch uploaded media (specifically the 'top' angle)
-    const { data: mediaRows } = await supabaseAdmin
-      .from("listing_media")
-      .select("storage_key")
-      .eq("listing_id", listingId)
-      .eq("angle", "top")
-      .maybeSingle();
-
-    let storageKey = mediaRows?.storage_key;
-    if (!storageKey) {
-      const { data: anyMedia } = await supabaseAdmin
+    // Use passed base64 photo if available, otherwise fetch from storage
+    let uploadTarget = photoBase64;
+    if (!uploadTarget) {
+      const { data: mediaRows } = await supabaseAdmin
         .from("listing_media")
         .select("storage_key")
         .eq("listing_id", listingId)
-        .limit(1);
-      if (anyMedia && anyMedia.length > 0) {
-        storageKey = anyMedia[0].storage_key;
+        .eq("angle", "top")
+        .maybeSingle();
+
+      let storageKey = mediaRows?.storage_key;
+      if (!storageKey) {
+        const { data: anyMedia } = await supabaseAdmin
+          .from("listing_media")
+          .select("storage_key")
+          .eq("listing_id", listingId)
+          .limit(1);
+        if (anyMedia && anyMedia.length > 0) {
+          storageKey = anyMedia[0].storage_key;
+        }
       }
+
+      const supabaseUrl = process.env.SUPABASE_URL || "https://kivsgplxeyhaxzuhfquk.supabase.co";
+      uploadTarget = storageKey
+        ? `${supabaseUrl}/storage/v1/object/public/resell-photos/${storageKey}`
+        : "";
     }
 
-    const supabaseUrl = process.env.SUPABASE_URL || "https://kivsgplxeyhaxzuhfquk.supabase.co";
-    const uploadedImageUrl = storageKey
-      ? `${supabaseUrl}/storage/v1/object/public/resell-photos/${storageKey}`
-      : "";
+    // Run CLIP & YOLO verification comparison
+    let clipPassed = false;
+    let clipScore = 0.0;
+    let clipDecision = "failed";
 
-    // Run CLIP verification comparison
-    let clipPassed = true;
-    let clipScore = 1.0;
-    let clipDecision = "verified";
-
-    if (uploadedImageUrl) {
-      if (originalImageUrl.toLowerCase().includes("screenshot")) {
-        console.log(
-          "Original catalog image is a screenshot, bypassing strict CLIP verification threshold.",
-        );
-        clipScore = 0.92;
-        clipDecision = "verified";
-        clipPassed = true;
-      } else {
-        const clipResult = await runClipVerification(originalImageUrl, uploadedImageUrl);
-        clipScore = clipResult.score;
-        clipDecision = clipResult.decision;
-        clipPassed = clipResult.verified;
-      }
+    if (uploadTarget) {
+      const clipResult = await runClipVerification(originalImageUrl, uploadTarget);
+      clipScore = clipResult.score;
+      clipDecision = clipResult.decision;
+      clipPassed = clipResult.verified;
     }
 
     // Simulated checks
@@ -467,7 +529,7 @@ export const submitForVerification = createServerFn({ method: "POST" })
         check_type: "clip_similarity_check",
         status: clipPassed ? "passed" : "failed",
         score: clipScore,
-        threshold: 0.75,
+        threshold: 0.50,
         evidence: { clip_similarity: clipScore, decision: clipDecision },
       },
     ]);

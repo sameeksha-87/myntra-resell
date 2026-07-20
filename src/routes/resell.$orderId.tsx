@@ -226,11 +226,14 @@ function ResellFlow() {
 
       // 3. Submit for AI verification
       setScanStatus("Running server checks for lighting, perspective and duplicate risk...");
+      const topPhoto = photos["top"] || photos["front"] || Object.values(photos)[0];
       const verifResult = await submitForVerification({
         data: {
           listingId: currentListingId,
           simBlur,
           simWrongAngle,
+          photoBase64: topPhoto,
+          catalogImageUrl: order.image,
         },
       });
 
@@ -1068,8 +1071,8 @@ function VerifyStep({
       key: "brand_check",
     },
     {
-      label: "CLIP image similarity match",
-      note: "Compare uploaded photos with purchased catalog photo",
+      label: "FashionCLIP & ORB verification match",
+      note: "Crop garment via Fashion YOLO, compare via FashionCLIP & ORB feature matching",
       key: "clip_similarity_check",
     },
     {
