@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   XCircle,
   Wallet,
+  Timer,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -750,6 +751,29 @@ function PhotoStep({
   );
 }
 
+function playBeep(freq = 800, duration = 0.1) {
+  if (typeof window === "undefined") return;
+  try {
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const audioCtx = new AudioContextClass();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch (e) {
+    console.warn("Audio playback failed", e);
+  }
+}
+
 function CameraModal({
   angleLabel,
   onCapture,
@@ -769,6 +793,11 @@ function CameraModal({
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState<string>("");
+
+  const [timerSecs, setTimerSecs] = useState<number>(0);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [timerActive, setTimerActive] = useState(false);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     async function startCamera() {
@@ -796,10 +825,44 @@ function CameraModal({
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
     };
   }, []);
 
   const handleCapture = async () => {
+    if (loading || !!error || scanning || timerActive) return;
+
+    if (timerSecs > 0) {
+      setTimerActive(true);
+      setCountdown(timerSecs);
+      playBeep(800, 0.1);
+
+      let currentSecs = timerSecs;
+      countdownIntervalRef.current = setInterval(() => {
+        currentSecs -= 1;
+        if (currentSecs <= 0) {
+          if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+          }
+          setCountdown(null);
+          setTimerActive(false);
+          playBeep(1200, 0.15); // Confirmation capture beep
+          captureNow();
+        } else {
+          setCountdown(currentSecs);
+          playBeep(800, 0.1);
+        }
+      }, 1000);
+    } else {
+      playBeep(1200, 0.15);
+      captureNow();
+    }
+  };
+
+  const captureNow = async () => {
     if (!videoRef.current) return;
     setScanning(true);
     setScanStatus("Analyzing image resolution and details...");
@@ -892,6 +955,28 @@ function CameraModal({
                 muted
                 className="h-full w-full object-cover"
               />
+
+              {/* Timer selector pill */}
+              <div className="absolute top-3 right-3 z-10 flex items-center gap-1 bg-black/65 backdrop-blur-md rounded-full border border-white/10 p-0.5">
+                <div className="pl-2 pr-1 text-zinc-400 flex items-center">
+                  <Timer className="h-3.5 w-3.5" />
+                </div>
+                {[0, 3, 5, 10].map((s) => (
+                  <button
+                    key={s}
+                    disabled={timerActive}
+                    onClick={() => setTimerSecs(s)}
+                    className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded-full cursor-pointer transition ${
+                      timerSecs === s
+                        ? "bg-primary text-primary-foreground shadow font-extrabold"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    {s === 0 ? "Off" : `${s}s`}
+                  </button>
+                ))}
+              </div>
+
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="border-2 border-dashed border-white/30 h-[80%] w-[80%] rounded-md flex items-center justify-center">
                   <span className="bg-black/60 px-2 py-0.5 text-[9px] font-bold tracking-widest text-white/90 uppercase rounded border border-white/10 mt-auto mb-2">
@@ -900,6 +985,18 @@ function CameraModal({
                 </div>
               </div>
             </>
+          )}
+
+          {countdown !== null && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-20">
+              <div className="animate-ping absolute inline-flex h-24 w-24 rounded-full bg-primary/20 opacity-75"></div>
+              <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-primary text-primary-foreground font-black text-4xl shadow-[0_0_20px_rgba(var(--primary),0.5)]">
+                {countdown}
+              </div>
+              <span className="mt-4 text-xs font-black uppercase tracking-wider text-white drop-shadow">
+                Pose now!
+              </span>
+            </div>
           )}
 
           {scanning && (
@@ -928,10 +1025,11 @@ function CameraModal({
           </button>
           <button
             onClick={handleCapture}
-            disabled={loading || !!error || scanning}
+            disabled={loading || !!error || scanning || timerActive}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/95 disabled:opacity-40 transition cursor-pointer"
           >
-            <Camera className="h-4 w-4" /> Capture Photo
+            <Camera className="h-4 w-4" />{" "}
+            {timerActive ? `Capturing in ${countdown}s` : "Capture Photo"}
           </button>
         </div>
       </div>
