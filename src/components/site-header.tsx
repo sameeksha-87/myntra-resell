@@ -5,14 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState, useRef, useEffect } from "react";
 
-const nav = [
-  { label: "MEN", to: "/" },
-  { label: "WOMEN", to: "/" },
-  { label: "KIDS", to: "/" },
-  { label: "HOME", to: "/" },
-  { label: "BEAUTY", to: "/" },
-  { label: "STUDIO", to: "/", tag: "New" },
-];
+const nav = [{ label: "HOME", to: "/" }];
 
 export function SiteHeader() {
   const { user } = useAuth();
