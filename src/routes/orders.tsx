@@ -289,7 +289,7 @@ function OrdersPage() {
       case "sold":
         return (
           <span className="bg-primary/10 text-primary text-[10px] font-bold uppercase px-2 py-0.5 rounded">
-            Paid (Escrow)
+            Paid (Secured)
           </span>
         );
       case "in_transit":

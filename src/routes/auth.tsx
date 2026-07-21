@@ -79,7 +79,7 @@ function AuthPage() {
           </p>
           <ul className="mt-6 space-y-2 text-sm text-muted-foreground">
             <li>✓ AI Verified every listing</li>
-            <li>✓ Doorstep inspection · escrow payments</li>
+            <li>✓ Doorstep inspection · secure payments</li>
             <li>✓ 48h buyer protection</li>
           </ul>
         </div>

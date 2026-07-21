@@ -176,7 +176,7 @@ function ListingStatus() {
   const stages = [
     { key: "verifying", label: "Verification", icon: ShieldCheck, note: "AI checks complete" },
     { key: "live", label: "Marketplace Live", icon: Sparkles, note: "Visible to buyers" },
-    { key: "sold", label: "Item Sold", icon: Wallet, note: "Buyer escrow authorized" },
+    { key: "sold", label: "Item Sold", icon: Wallet, note: "Buyer payment authorized" },
     {
       key: "inspection",
       label: "Inspection / Shipping",
@@ -376,7 +376,7 @@ function ListingStatus() {
               <div className="mt-3 bg-card border border-border/50 p-3 rounded text-[11px] text-muted-foreground">
                 Our operations console is auditing the photo submissions, inspection logs, and
                 ledger allocations. A resolution will be applied within 24 hours. Payout is
-                currently locked in Escrow.
+                currently locked for review.
               </div>
             </div>
           )}
@@ -390,8 +390,8 @@ function ListingStatus() {
                   Order Refunded & Dispute Closed
                 </div>
                 <p className="text-muted-foreground mt-1">
-                  The dispute has been resolved in favor of the buyer. The escrow hold has been
-                  fully released back to the buyer's account.
+                  The dispute has been resolved in favor of the buyer. The holding has been fully
+                  released back to the buyer's account.
                 </p>
               </div>
             </div>
@@ -488,7 +488,7 @@ function ListingStatus() {
           {/* Provisional/Final Payout box */}
           <div className="rounded-md border border-border bg-card p-5 shadow-card leading-relaxed">
             <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-              {isSeller ? "Seller Payout Payout" : "Escrow Payment Holding"}
+              {isSeller ? "Seller Payout" : "Secure Payment Holding"}
             </div>
             <div className="mt-1 text-2xl font-black">
               {inr(
@@ -505,7 +505,7 @@ function ListingStatus() {
             <div className="text-xs text-muted-foreground mt-1">
               {isSeller
                 ? `60% of listing price ${inr(order ? order.final_price_paise / 100 : listing.current_price_paise / 100)}`
-                : `Escrow hold ID: escrow_${id.slice(0, 6)}`}
+                : `Holding ID: txn_${id.slice(0, 6)}`}
             </div>
 
             {/* Seller Payout Claim Action */}

@@ -618,7 +618,7 @@ function ProductPage() {
               <div>
                 <div className="font-bold">Free delivery in 4–6 days</div>
                 <div className="text-xs text-muted-foreground">
-                  Escrow protected · pay only after inspection
+                  Secure payment · pay only after inspection
                 </div>
               </div>
             </div>

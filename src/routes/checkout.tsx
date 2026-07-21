@@ -238,7 +238,7 @@ function CheckoutPage() {
         setProcessStep("Reserving exclusive item in listing ledger...");
         await new Promise((resolve) => setTimeout(resolve, 800));
 
-        setProcessStep("Establishing escrow holding container...");
+        setProcessStep("Establishing secure holding container...");
         await new Promise((resolve) => setTimeout(resolve, 850));
 
         setProcessStep("Authorizing payment gateways & logs...");
@@ -257,7 +257,9 @@ function CheckoutPage() {
       setProcessStep("Order confirmed!");
       await new Promise((resolve) => setTimeout(resolve, 800));
 
-      toast.success("Order placed successfully! Funds are held securely in Escrow.");
+      toast.success(
+        "Order placed successfully! Payout will be processed after doorstep inspection.",
+      );
       navigate({ to: "/orders" });
     } catch (err: any) {
       console.error(err);
@@ -315,7 +317,7 @@ function CheckoutPage() {
 
         <h1 className="text-2xl font-black uppercase tracking-wide">Checkout</h1>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Secure Escrow Protection active · Pay after doorstep inspection
+          Secure Payout Protection active · Pay after doorstep inspection
         </p>
 
         <div className="mt-8 grid gap-8 md:grid-cols-[1.4fr_1fr]">
@@ -496,10 +498,10 @@ function CheckoutPage() {
               <div className="mt-4 p-4 border border-primary/20 bg-primary/5 rounded-md flex items-center gap-3">
                 <input type="radio" checked readOnly className="accent-primary h-4 w-4" />
                 <div className="text-xs">
-                  <div className="font-bold text-foreground">Escrow Payment Protection</div>
+                  <div className="font-bold text-foreground">Secure Payment Protection</div>
                   <div className="text-muted-foreground mt-0.5 leading-normal">
-                    Funds will stay in a secure Myntra Escrow account. The seller is paid only after
-                    delivery is inspected at your door and the 48-hour dispute window closes.
+                    Funds will stay in a secure Myntra account. The seller is paid only after
+                    delivery is inspected at your door and the 48-hour quality inspection completes.
                   </div>
                 </div>
               </div>
@@ -551,15 +553,15 @@ function CheckoutPage() {
                 onClick={handlePlaceOrder}
                 className="mt-5 h-12 w-full rounded-md bg-primary text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/95 disabled:opacity-40 cursor-pointer shadow transition"
               >
-                Place Order & Pay Escrow
+                Place Order
               </button>
 
               <div className="mt-4 flex items-start gap-1.5 text-[10px] text-muted-foreground leading-relaxed">
                 <ShieldCheck className="h-4 w-4 text-success flex-shrink-0" />
                 <div>
-                  By placing this order, you authorize Myntra to hold your funds in Escrow. If the
-                  doorstep inspection reveals grade discrepancies, you will be offered the revised
-                  terms and are entitled to a full refund if rejected.
+                  By placing this order, you authorize Myntra to process your payment securely. If
+                  the doorstep inspection reveals grade discrepancies, you will be offered the
+                  revised terms and are entitled to a full refund if rejected.
                 </div>
               </div>
             </div>

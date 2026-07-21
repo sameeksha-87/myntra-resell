@@ -141,7 +141,7 @@ async function runClipVerification(
       throw new Error(result.error);
     }
 
-    const finalScore = result.final_score !== undefined ? result.final_score : (result.score || 0.0);
+    const finalScore = result.final_score !== undefined ? result.final_score : result.score || 0.0;
     const scorePct = (finalScore * 100).toFixed(1);
     const embeddingPct = result.embedding_score
       ? (result.embedding_score * 100).toFixed(1) + "%"

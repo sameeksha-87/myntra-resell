@@ -227,7 +227,7 @@ export function SiteFooter() {
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
             <li>AI Verification</li>
             <li>Buyer Protection · 48h</li>
-            <li>Escrow Payments</li>
+            <li>Secure Payments</li>
           </ul>
         </div>
       </div>

@@ -41,10 +41,10 @@ export const Route = createFileRoute("/resell/$orderId")({
 
 type Step = 0 | 1 | 2;
 
-const angles = [
-  { key: "top", label: "Top Angle", tip: "Collar, shoulders, or top-down view" },
-  { key: "left", label: "Left Angle", tip: "Left side profile showing seams/sleeves" },
-  { key: "right", label: "Right Angle", tip: "Right side profile showing seams/sleeves" },
+const requiredAngles = [
+  { key: "top", label: "Top View", tip: "Collar, shoulders, or top-down view", required: true },
+  { key: "left", label: "Front View", tip: "Flat lay showing front of the item", required: true },
+  { key: "right", label: "Back View", tip: "Flat lay showing back of the item", required: true },
 ];
 
 const grades: { grade: Grade; blurb: string; example: string }[] = [
@@ -93,7 +93,12 @@ function ResellFlow() {
   const [simBlur, setSimBlur] = useState<boolean>(false);
   const [simWrongAngle, setSimWrongAngle] = useState<boolean>(false);
 
+  const [optionalSlots, setOptionalSlots] = useState<
+    { key: string; label: string; tip: string; required: boolean }[]
+  >([]);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -256,25 +261,18 @@ function ResellFlow() {
     }
   };
 
-  const handleMobileCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !activeAngle) return;
+  const processFile = async (file: File, key: string) => {
+    setScanningAngle(key);
+    setScanStatus("Reading image...");
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
 
-    const angleKey = activeAngle;
-    setActiveAngle(null);
-    setScanningAngle(angleKey);
-    setScanStatus("Reading captured image...");
-
-    const dataUrl = await new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(file);
-    });
-
-    if (fileInputRef.current) fileInputRef.current.value = "";
-
-    setTimeout(async () => {
-      setScanStatus("Analyzing image focus (Laplacian Variance)...");
+      setScanStatus("Analyzing image focus...");
       let blurResult = await measureBlur(dataUrl);
 
       if (simBlur) {
@@ -285,40 +283,94 @@ function ResellFlow() {
         toast.error(
           `Rejected: Photo is too blurry! (Variance: ${Math.round(blurResult.variance)} < 100). Hold camera steady and retake.`,
         );
-        setScanningAngle(null);
         return;
       }
 
       setScanStatus("Checking perspective alignment...");
-      setTimeout(() => {
-        if (simWrongAngle) {
-          toast.error(
-            `Rejected: Incorrect perspective angle. Please align the item to match the requested framing.`,
-          );
-          setScanningAngle(null);
-          return;
-        }
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
-        toast.success(
-          `AI Verification Passed! Sharpness: ${Math.round(blurResult.variance)} | Perspective: 93%`,
+      if (simWrongAngle && key === "top") {
+        toast.error(
+          `Rejected: Incorrect perspective angle. Please align the item to match the requested framing.`,
         );
-        setPhotos((prev) => ({ ...prev, [angleKey]: dataUrl }));
-        setScanningAngle(null);
-      }, 1000);
-    }, 1200);
+        return;
+      }
+
+      toast.success(
+        `AI Verification Passed! Sharpness: ${Math.round(blurResult.variance)} | Perspective: 93%`,
+      );
+      setPhotos((prev) => ({ ...prev, [key]: dataUrl }));
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to process image");
+    } finally {
+      setScanningAngle(null);
+    }
+  };
+
+  const handleCameraCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeAngle) return;
+    const key = activeAngle;
+    setActiveAngle(null);
+    await processFile(file, key);
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+  };
+
+  const handleFileBrowse = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeAngle) return;
+    const key = activeAngle;
+    setActiveAngle(null);
+    await processFile(file, key);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const triggerCamera = (key: string) => {
+    setActiveAngle(key);
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
       navigator.userAgent,
     );
-    setActiveAngle(key);
-
     if (isMobile) {
-      if (fileInputRef.current) {
-        fileInputRef.current.click();
+      if (cameraInputRef.current) {
+        cameraInputRef.current.click();
       }
     }
+  };
+
+  const triggerUpload = (key: string) => {
+    setActiveAngle(key);
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const addOptionalSlot = () => {
+    const totalCount = requiredAngles.length + optionalSlots.length;
+    if (totalCount >= 10) {
+      toast.error("You can upload a maximum of 10 photos.");
+      return;
+    }
+    const nextIndex = optionalSlots.length + 1;
+    const newKey = `optional_${Date.now()}`;
+    setOptionalSlots((prev) => [
+      ...prev,
+      {
+        key: newKey,
+        label: `Photo ${requiredAngles.length + nextIndex}`,
+        tip: "Optional angle, tag, or defect photo",
+        required: false,
+      },
+    ]);
+  };
+
+  const removeOptionalSlot = (key: string) => {
+    setOptionalSlots((prev) => prev.filter((s) => s.key !== key));
+    setPhotos((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
   };
 
   const handleWebcamCapture = (dataUrl: string) => {
@@ -349,9 +401,17 @@ function ResellFlow() {
         type="file"
         ref={fileInputRef}
         accept="image/*"
+        className="hidden"
+        onChange={handleFileBrowse}
+      />
+
+      <input
+        type="file"
+        ref={cameraInputRef}
+        accept="image/*"
         capture="environment"
         className="hidden"
-        onChange={handleMobileCapture}
+        onChange={handleCameraCapture}
       />
 
       {activeAngle &&
@@ -359,7 +419,9 @@ function ResellFlow() {
           navigator.userAgent,
         ) && (
           <CameraModal
-            angleLabel={angles.find((a) => a.key === activeAngle)?.label || ""}
+            angleLabel={
+              [...requiredAngles, ...optionalSlots].find((a) => a.key === activeAngle)?.label || ""
+            }
             onCapture={handleWebcamCapture}
             onClose={() => setActiveAngle(null)}
             simBlur={simBlur}
@@ -406,6 +468,12 @@ function ResellFlow() {
               setSimBlur={setSimBlur}
               simWrongAngle={simWrongAngle}
               setSimWrongAngle={setSimWrongAngle}
+              requiredAngles={requiredAngles}
+              optionalSlots={optionalSlots}
+              onAddOptional={addOptionalSlot}
+              onRemoveOptional={removeOptionalSlot}
+              processFile={processFile}
+              onTriggerUpload={triggerUpload}
             />
           )}
           {step === 1 && (
@@ -432,44 +500,74 @@ function ResellFlow() {
           )}
         </div>
 
-        <aside className="rounded-md border border-border bg-card p-4 shadow-card h-fit sticky top-20">
-          <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            Item Spec
-          </div>
-          <div className="mt-2 flex gap-3">
-            <img
-              src={order.image}
-              alt={order.title}
-              className="h-28 w-20 rounded-sm object-cover bg-muted"
-            />
-            <div>
-              <div className="text-sm font-bold">{order.brand}</div>
-              <div className="text-xs text-muted-foreground leading-snug">{order.title}</div>
-              <div className="mt-2 text-[11px] text-muted-foreground space-y-0.5">
+        <aside className="rounded-xl border border-border bg-card p-5 shadow-sm h-fit sticky top-24 space-y-5">
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
+              Listing Summary
+            </h3>
+            <div className="flex gap-4">
+              <img
+                src={order.image}
+                alt={order.title}
+                className="h-28 w-20 rounded-md object-cover bg-muted border border-border shadow-sm"
+              />
+              <div className="flex flex-col justify-between py-1">
                 <div>
-                  <b>Size:</b> {order.size}
+                  <div className="text-sm font-black text-foreground">{order.brand}</div>
+                  <div className="text-xs text-muted-foreground leading-snug line-clamp-2 mt-0.5">
+                    {order.title}
+                  </div>
                 </div>
-                <div>
-                  <b>Bought:</b> {order.purchaseDate}
-                </div>
-                <div>
-                  <b>Original Price:</b> {inr(order.originalPrice)}
+                <div className="inline-flex items-center gap-1.5 rounded bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground w-fit">
+                  Size: {order.size}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="my-4 h-px bg-border" />
+          <div className="border-t border-border pt-4 space-y-2.5">
+            <SummaryRow label="Original Purchase Price" value={inr(order.originalPrice)} />
+            <SummaryRow label="Estimated Resale Price" value={inr(activePrice.listPrice)} bold />
+            <SummaryRow label="Seller Payout" value={inr(activePrice.sellerPayout)} accent bold />
+            <SummaryRow
+              label="Photos Uploaded"
+              value={`${photosDone} / ${requiredAngles.length + optionalSlots.length}`}
+            />
+            <SummaryRow label="Declared Grade" value={grade} />
+          </div>
 
-          <SummaryRow label="Photos" value={`${photosDone} / ${angles.length}`} />
-          <SummaryRow label="Declared grade" value={grade} />
-          <SummaryRow label="Provisional price" value={inr(activePrice.listPrice)} bold />
-          <SummaryRow label="Your payout (60%)" value={inr(activePrice.sellerPayout)} accent />
-          <SummaryRow label="Myntra fee (40%)" value={inr(activePrice.commission)} />
+          <div className="border-t border-border pt-4">
+            <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+              Verification Status
+            </div>
+            {verifying ? (
+              <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-600 border border-amber-500/20">
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                AI Verification in progress...
+              </div>
+            ) : verified ? (
+              <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-600 border border-emerald-500/20">
+                <Check className="h-3.5 w-3.5 animate-pulse" />
+                Verified & Ready
+              </div>
+            ) : verifFailed ? (
+              <div className="flex items-center gap-2 rounded-lg bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-600 border border-rose-500/20">
+                <XCircle className="h-3.5 w-3.5" />
+                Verification Failed
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-lg bg-zinc-500/10 px-3 py-2 text-xs font-bold text-zinc-600 border border-zinc-500/20">
+                <AlertTriangle className="h-3.5 w-3.5 text-zinc-500" />
+                Draft ({photosDone} / {requiredAngles.length + optionalSlots.length} photos)
+              </div>
+            )}
+          </div>
 
-          <div className="mt-3 rounded-sm bg-accent/50 p-2.5 text-[11px] text-accent-foreground leading-relaxed">
-            <ShieldCheck className="mr-1 inline h-3.5 w-3.5 text-success" />
-            Price locks after doorstep inspection confirms grade.
+          <div className="rounded-lg bg-muted/40 p-3 text-[11px] text-muted-foreground leading-relaxed">
+            <span className="font-semibold text-foreground font-black">
+              Quality Inspection Note:
+            </span>{" "}
+            Your final payout will be processed after the item passes the quality inspection.
           </div>
         </aside>
       </div>
@@ -524,6 +622,12 @@ interface PhotoStepProps {
   setSimBlur: (v: boolean) => void;
   simWrongAngle: boolean;
   setSimWrongAngle: (v: boolean) => void;
+  requiredAngles: { key: string; label: string; tip: string; required: boolean }[];
+  optionalSlots: { key: string; label: string; tip: string; required: boolean }[];
+  onAddOptional: () => void;
+  onRemoveOptional: (key: string) => void;
+  processFile: (file: File, key: string) => Promise<void>;
+  onTriggerUpload: (key: string) => void;
 }
 
 function PhotoStep({
@@ -542,106 +646,216 @@ function PhotoStep({
   done,
   scanningAngle,
   scanStatus,
-  simBlur,
-  setSimBlur,
-  simWrongAngle,
-  setSimWrongAngle,
+  requiredAngles,
+  optionalSlots,
+  onAddOptional,
+  onRemoveOptional,
+  processFile,
+  onTriggerUpload,
 }: PhotoStepProps) {
-  return (
-    <section>
-      <h2 className="text-2xl font-black">Add photos & details of your item</h2>
-      <p className="mt-1 text-sm text-muted-foreground text-pretty">
-        Use the in-app camera viewfinder to capture each perspective angle. Local file system
-        selection is disabled as an anti-fraud measure.
-      </p>
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const requiredDone = requiredAngles.every((a) => !!photos[a.key]);
 
-      <div className="mt-4 rounded-md border border-dashed border-primary bg-primary/5 p-4 text-sm">
-        <div className="flex items-center gap-2 font-bold text-primary mb-2">
-          <Sliders className="h-4 w-4" /> AI Guardrails Simulation Controls
-        </div>
-        <p className="text-xs text-muted-foreground mb-3 text-pretty">
-          Simulate verification errors to inspect the validation and failure retaking states.
+  const renderCard = (a: { key: string; label: string; tip: string; required?: boolean }) => {
+    const photoUrl = photos[a.key];
+    const isScanning = scanningAngle === a.key;
+
+    return (
+      <div
+        key={a.key}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={async (e) => {
+          e.preventDefault();
+          const file = e.dataTransfer.files?.[0];
+          if (file) {
+            await processFile(file, a.key);
+          }
+        }}
+        className={`group relative aspect-[3/4] rounded-xl border-2 border-dashed p-3 text-left transition flex flex-col justify-between ${
+          photoUrl
+            ? "border-success bg-success/5"
+            : isScanning
+              ? "border-primary bg-primary/5 cursor-wait"
+              : a.required
+                ? "border-primary/45 hover:border-primary bg-background shadow-xs"
+                : "border-border/80 hover:border-primary bg-background/40"
+        }`}
+      >
+        {photoUrl ? (
+          <>
+            <img
+              src={photoUrl}
+              alt={a.label}
+              className="absolute inset-0 h-full w-full rounded-xl object-cover"
+            />
+            <div className="absolute inset-0 rounded-xl bg-black/40" />
+
+            <div className="absolute right-2 top-2 flex gap-1 z-20">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (a.required) {
+                    onTrigger(a.key); // simple reload or allow retaking
+                  } else {
+                    onRemoveOptional(a.key);
+                  }
+                }}
+                className="rounded-full bg-black/60 p-1 text-white hover:bg-rose-600 transition cursor-pointer shadow"
+                title={a.required ? "Clear Photo" : "Remove Photo"}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+
+            <div className="absolute left-3 bottom-3 z-10 flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-wider text-white">
+                {a.label}
+              </span>
+              <span className="text-[8px] text-zinc-300">
+                {a.required ? "Required" : "Optional"}
+              </span>
+            </div>
+
+            <div className="absolute right-3 bottom-3 z-10 rounded-full bg-success p-1 text-white shadow">
+              <Check className="h-2.5 w-2.5" />
+            </div>
+          </>
+        ) : isScanning ? (
+          <div className="flex h-full flex-col items-center justify-center text-center p-1">
+            <RefreshCw className="h-5 w-5 animate-spin text-primary mb-2" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-primary animate-pulse">
+              Processing...
+            </span>
+            <span className="text-[8px] text-muted-foreground mt-1 line-clamp-2">{scanStatus}</span>
+          </div>
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center text-center p-2 my-auto">
+            <Camera className="h-5 w-5 text-muted-foreground group-hover:text-primary mb-2 mx-auto" />
+            <div className="text-[10px] font-bold uppercase text-foreground leading-tight">
+              {a.label}
+              {a.required && <span className="text-primary ml-0.5">*</span>}
+            </div>
+            <div className="mt-1 text-[8px] text-muted-foreground leading-snug">{a.tip}</div>
+
+            <div className="mt-3.5 flex gap-1.5 z-10 justify-center">
+              <button
+                type="button"
+                onClick={() => onTrigger(a.key)}
+                className="px-2 py-1 text-[9px] bg-primary text-primary-foreground rounded hover:bg-primary/95 font-bold uppercase cursor-pointer"
+              >
+                Camera
+              </button>
+              <button
+                type="button"
+                onClick={() => onTriggerUpload(a.key)}
+                className="px-2 py-1 text-[9px] bg-muted text-muted-foreground border border-border rounded hover:bg-muted/80 font-bold uppercase cursor-pointer"
+              >
+                Upload
+              </button>
+            </div>
+
+            {!a.required && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemoveOptional(a.key);
+                }}
+                className="absolute right-2 top-2 rounded-full p-1 text-muted-foreground hover:text-rose-600 transition cursor-pointer"
+                title="Delete Card"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <section className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-black">Add photos & details of your item</h2>
+        <p className="mt-1 text-sm text-muted-foreground text-pretty">
+          Capture or upload your item's photos. Our AI will automatically verify them for quality
+          and alignment.
         </p>
-        <div className="flex flex-col sm:flex-row gap-4">
-          <label className="flex items-center gap-2 cursor-pointer font-semibold text-xs select-none">
-            <input
-              type="checkbox"
-              checked={simBlur}
-              onChange={(e) => setSimBlur(e.target.checked)}
-              className="rounded border-border focus:ring-primary h-4 w-4"
-            />
-            Simulate Blurry Photo (Sharpness &lt; 100)
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer font-semibold text-xs select-none">
-            <input
-              type="checkbox"
-              checked={simWrongAngle}
-              onChange={(e) => setSimWrongAngle(e.target.checked)}
-              className="rounded border-border focus:ring-primary h-4 w-4"
-            />
-            Simulate Perspective/Angle Mismatch
-          </label>
-        </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-3 gap-3">
-        {angles.map((a) => {
-          const photoUrl = photos[a.key];
-          const isScanning = scanningAngle === a.key;
+      {/* Photo Upload Guidelines */}
+      <div className="rounded-xl border border-border bg-muted/40 p-5 shadow-xs">
+        <h3 className="flex items-center gap-2 font-bold text-foreground mb-3 text-sm">
+          <Sparkles className="h-4 w-4 text-primary" /> Photo Upload Guidelines
+        </h3>
+        <ul className="grid gap-2.5 sm:grid-cols-2 text-xs text-muted-foreground">
+          <li className="flex items-start gap-2">
+            <Check className="h-3.5 w-3.5 text-success shrink-0 mt-0.5" />
+            <span>Place the item on a plain background.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Check className="h-3.5 w-3.5 text-success shrink-0 mt-0.5" />
+            <span>Use good lighting and avoid blurry photos.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Check className="h-3.5 w-3.5 text-success shrink-0 mt-0.5" />
+            <span>Lay the item flat and keep it fully visible.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Check className="h-3.5 w-3.5 text-success shrink-0 mt-0.5" />
+            <span>Capture the main photo from a top-down angle.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Check className="h-3.5 w-3.5 text-success shrink-0 mt-0.5" />
+            <span>Do not use filters or edit the images.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Check className="h-3.5 w-3.5 text-success shrink-0 mt-0.5" />
+            <span>Ensure the brand and size tags are visible.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Check className="h-3.5 w-3.5 text-success shrink-0 mt-0.5" />
+            <span>Include clear photos of any defects, if present.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Check className="h-3.5 w-3.5 text-success shrink-0 mt-0.5" />
+            <span>Upload photos of the front, back, brand tag, size tag, and any defects.</span>
+          </li>
+        </ul>
+      </div>
 
-          return (
+      {/* Upload grid section */}
+      <div>
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            Item Photos
+          </h3>
+          <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+            {done} of {requiredAngles.length + optionalSlots.length} Photos Uploaded
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {requiredAngles.map((a) => renderCard(a))}
+          {optionalSlots.map((a) => renderCard(a))}
+        </div>
+
+        {requiredAngles.length + optionalSlots.length < 10 && (
+          <div className="mt-4 flex justify-center">
             <button
-              key={a.key}
-              onClick={() => !isScanning && onTrigger(a.key)}
-              className={`group relative aspect-[3/4] rounded-md border-2 border-dashed p-3 text-left transition ${
-                photoUrl
-                  ? "border-success bg-success/5 cursor-pointer"
-                  : isScanning
-                    ? "border-primary bg-primary/5 cursor-wait"
-                    : "border-border hover:border-primary cursor-pointer"
-              }`}
+              type="button"
+              onClick={onAddOptional}
+              className="flex items-center gap-1.5 rounded-lg border border-primary/30 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-primary hover:bg-primary/5 transition cursor-pointer"
             >
-              {photoUrl ? (
-                <>
-                  <img
-                    src={photoUrl}
-                    alt=""
-                    className="absolute inset-0 h-full w-full rounded-md object-cover"
-                  />
-                  <div className="absolute inset-0 rounded-md bg-black/30" />
-                  <div className="absolute right-2 top-2 rounded-full bg-success p-1 text-white shadow-md">
-                    <Check className="h-3 w-3" />
-                  </div>
-                  <div className="absolute bottom-2 left-2 text-[10px] font-bold uppercase tracking-wide text-white">
-                    {a.label}
-                  </div>
-                </>
-              ) : isScanning ? (
-                <div className="flex h-full flex-col items-center justify-center text-center p-1">
-                  <RefreshCw className="h-5 w-5 animate-spin text-primary mb-1.5" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-primary animate-pulse">
-                    Scanning...
-                  </span>
-                  <span className="text-[8px] text-muted-foreground mt-0.5 line-clamp-2">
-                    {scanStatus}
-                  </span>
-                </div>
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center text-center p-1">
-                  <Camera className="h-5 w-5 text-muted-foreground group-hover:text-primary mb-1.5" />
-                  <div className="text-[10px] font-bold uppercase">{a.label}</div>
-                  <div className="mt-0.5 text-[8px] text-muted-foreground leading-tight">
-                    {a.tip}
-                  </div>
-                </div>
-              )}
+              + Add More Photos
             </button>
-          );
-        })}
+          </div>
+        )}
       </div>
 
       {/* Condition & details section */}
-      <div className="mt-6 rounded-md border border-border bg-card p-5 shadow-card">
+      <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
         <h3 className="text-base font-bold uppercase tracking-wider flex items-center gap-1.5 mb-4 text-foreground border-b border-border pb-2">
           <Sliders className="h-5 w-5 text-primary" /> Product Condition & Details
         </h3>
@@ -683,7 +897,7 @@ function PhotoStep({
       </div>
 
       {/* Price section */}
-      <div className="mt-6 rounded-md border border-border bg-card p-5 shadow-card">
+      <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
         <h3 className="text-base font-bold uppercase tracking-wider flex items-center gap-1.5 mb-4 text-foreground border-b border-border pb-2">
           <Wallet className="h-5 w-5 text-primary" /> Pricing & Payout
         </h3>
@@ -717,37 +931,27 @@ function PhotoStep({
             </p>
           </div>
 
-          <div className="rounded-md bg-muted/40 p-3 text-xs divide-y divide-border">
-            <div className="flex justify-between pb-2">
-              <span className="text-muted-foreground font-semibold">Your payout (60%)</span>
-              <span className="text-success font-black">{inr(activePrice.sellerPayout)}</span>
+          <div className="rounded-md bg-muted/40 p-4 text-xs">
+            <div className="text-muted-foreground font-bold uppercase tracking-wider text-[10px] mb-1">
+              Seller Receives
             </div>
-            <div className="flex justify-between pt-2">
-              <span className="text-muted-foreground font-semibold">Myntra resell fee (40%)</span>
-              <span className="font-bold">{inr(activePrice.commission)}</span>
+            <div className="text-2xl font-black text-success mb-2">
+              {inr(activePrice.sellerPayout)}
+            </div>
+            <div className="text-muted-foreground leading-relaxed text-[11px]">
+              "Your final payout will be processed after the item passes the quality inspection."
             </div>
           </div>
         </div>
       </div>
 
-      <div className="mt-6 rounded-md border border-border bg-accent/40 p-3.5 text-xs leading-relaxed">
-        <div className="mb-1 font-bold uppercase tracking-wide flex items-center gap-1.5">
-          <ShieldCheck className="h-4 w-4 text-success" /> Live capture guardrails active
-        </div>
-        <ul className="list-inside list-disc space-y-1 text-muted-foreground">
-          <li>Blur, lighting and detail level checked instantly on device</li>
-          <li>Angle Verification limits capture to specified layout alignment guide</li>
-          <li>System gallery upload is blocked; only native viewport captures allowed</li>
-        </ul>
-      </div>
-
       <div className="mt-6 flex justify-end">
         <button
           onClick={onContinue}
-          disabled={done < angles.length}
+          disabled={!requiredDone}
           className="rounded-md bg-primary px-6 py-3 text-sm font-bold uppercase tracking-wide text-primary-foreground disabled:opacity-40 cursor-pointer"
         >
-          Verify & Publish Listing ({done}/{angles.length})
+          Verify & Publish Listing ({done}/{requiredAngles.length + optionalSlots.length})
         </button>
       </div>
     </section>

@@ -130,7 +130,7 @@ function BagPage() {
         <div>
           <h1 className="text-2xl font-black">My Bag</h1>
           <p className="text-sm text-muted-foreground">
-            {items.length} item{items.length === 1 ? "" : "s"} · escrow-protected circular check
+            {items.length} item{items.length === 1 ? "" : "s"} · secured circular quality check
           </p>
 
           {busy ? (
@@ -235,7 +235,7 @@ function BagPage() {
 
           <div className="mt-4 space-y-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-verified" /> Escrow-protected · pay after
+              <ShieldCheck className="h-4 w-4 text-verified" /> Secure Purchase · pay after
               inspection
             </div>
             <div className="flex items-center gap-2">

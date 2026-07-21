@@ -263,7 +263,7 @@ function AdminPage() {
           <div className="rounded-md border border-border p-4 bg-background">
             <Coins className="mx-auto h-5 w-5 text-primary mb-1.5" />
             <div className="text-xs font-bold uppercase text-muted-foreground">
-              Total Escrow Hold
+              Total Pending Payouts
             </div>
             <div className="mt-1 text-xl font-black text-foreground">{inr(escrowBalance)}</div>
           </div>
@@ -589,7 +589,8 @@ function AdminPage() {
             <div className="mb-4">
               <h2 className="text-lg font-black uppercase tracking-wide">Double-Entry Ledger</h2>
               <p className="text-xs text-muted-foreground">
-                Immutable business audit trail of all cash flows inside Escrow and payout nodes
+                Immutable business audit trail of all cash flows inside ledger holding and payout
+                nodes
               </p>
             </div>
 

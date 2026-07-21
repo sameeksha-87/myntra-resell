@@ -42,8 +42,8 @@ async function run() {
     return;
   }
 
-  const failed = (listings || []).filter((l: any) =>
-    l.status === "verification_failed" || l.id.toLowerCase().startsWith("33c033b7")
+  const failed = (listings || []).filter(
+    (l: any) => l.status === "verification_failed" || l.id.toLowerCase().startsWith("33c033b7"),
   );
 
   console.log(`Deleting ${failed.length} failed listings...`);
