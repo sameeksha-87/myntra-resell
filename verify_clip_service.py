@@ -215,7 +215,10 @@ def stage3_dinov2_embeddings(img1, img2, processor, model):
             emb2 = emb2 / emb2.norm(dim=-1, keepdim=True)
             
             sim = F.cosine_similarity(emb1, emb2).item()
-            return float(sim)
+            # DINOv2 cosine similarity is tightly bounded. Scale [0.15, 0.60] to [0.0, 1.0]
+            scaled_sim = (sim - 0.15) / 0.45
+            scaled_sim = max(0.0, min(1.0, scaled_sim))
+            return float(scaled_sim)
     except Exception as e:
         logger.error(f"DINOv2 similarity warning: {e}")
         return 0.5
@@ -348,11 +351,11 @@ def run_pipeline(original_src, uploaded_src, target_brand=""):
             
         final_score = max(0.0, min(1.0, final_score))
         
-        # Make decision labels
+        # Make decision labels aligned with user's 0.60 minimum threshold
         if final_score >= 0.75:
             verified = True
             decision = "verified"
-        elif final_score >= 0.50:
+        elif final_score >= 0.60:
             verified = True
             decision = "manual_review"
         else:

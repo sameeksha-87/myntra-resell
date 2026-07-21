@@ -610,7 +610,7 @@ export const submitForVerification = createServerFn({ method: "POST" })
         check_type: "clip_similarity_check",
         status: clipPassed ? "passed" : "failed",
         score: clipScore,
-        threshold: 0.5,
+        threshold: 0.6,
         evidence: { clip_similarity: clipScore, decision: clipDecision },
       },
     ]);
