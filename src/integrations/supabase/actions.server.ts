@@ -516,11 +516,19 @@ export const submitForVerification = createServerFn({ method: "POST" })
     // Fetch original purchase image and brand name
     const { data: item } = await supabaseAdmin
       .from("myntra_order_items")
-      .select("image, brand:brands(name)")
+      .select("image, brand_id, title")
       .eq("id", listing.source_order_item_id)
       .single();
 
-    const brandName = item?.brand?.name || "";
+    let brandName = "";
+    if (item?.brand_id) {
+      const { data: bData } = await supabaseAdmin
+        .from("brands")
+        .select("name")
+        .eq("id", item.brand_id)
+        .maybeSingle();
+      brandName = bData?.name || "";
+    }
 
     const originalImageUrl =
       catalogImageUrl ||

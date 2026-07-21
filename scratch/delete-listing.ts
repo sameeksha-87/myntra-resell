@@ -32,39 +32,25 @@ if (!url || !key) {
 const supabase = createClient(url, key);
 
 async function run() {
-  console.log("Fetching all listings...");
+  console.log("Cleaning failed listings...");
   const { data: listings, error: fetchErr } = await supabase
     .from("listings")
-    .select("id, title, status, source_order_item_id");
+    .select("id, title, status");
 
   if (fetchErr) {
     console.error("Fetch error:", fetchErr);
     return;
   }
 
-  console.log(`Found ${listings?.length || 0} total listings.`);
-  const matching = (listings || []).filter((l: any) => l.id.toLowerCase().startsWith("aed40eeb"));
+  const failed = (listings || []).filter((l: any) =>
+    l.status === "verification_failed" || l.id.toLowerCase().startsWith("33c033b7")
+  );
 
-  if (matching.length > 0) {
-    for (const l of matching) {
-      console.log(`Deleting listing ${l.id} (${l.title}, status: ${l.status})...`);
-      const { error: delErr } = await supabase.from("listings").delete().eq("id", l.id);
-      if (delErr) {
-        console.error(`Failed to delete ${l.id}:`, delErr.message);
-      } else {
-        console.log(`Successfully deleted listing ${l.id}!`);
-      }
-    }
-  } else {
-    console.log(
-      "Listing AED40EEB not found directly. Deleting all verification_pending & verification_failed listings...",
-    );
-    const { data: pending, error: pendErr } = await supabase
-      .from("listings")
-      .delete()
-      .in("status", ["verification_pending", "verification_failed"]);
-    if (pendErr) console.error("Error clearing pending:", pendErr);
-    else console.log("Cleared pending/failed draft listings!");
+  console.log(`Deleting ${failed.length} failed listings...`);
+  for (const f of failed) {
+    const { error: delErr } = await supabase.from("listings").delete().eq("id", f.id);
+    if (delErr) console.error(`Failed to delete ${f.id}:`, delErr.message);
+    else console.log(`Deleted failed listing ${f.id}`);
   }
 }
 

@@ -207,6 +207,7 @@ function OrdersPage() {
         `,
         )
         .eq("seller_id", user!.id)
+        .neq("status", "verification_failed")
         .order("created_at", { ascending: false });
 
       if (error) throw error;

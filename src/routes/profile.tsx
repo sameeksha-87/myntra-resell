@@ -41,6 +41,7 @@ function ProfilePage() {
       .from("listings")
       .select("id", { count: "exact", head: true })
       .eq("seller_id", user.id)
+      .neq("status", "verification_failed")
       .then(({ count }) => {
         setListingCount(count ?? 0);
       });
