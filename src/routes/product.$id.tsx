@@ -167,8 +167,8 @@ function ProductPage() {
         status: data.status,
         priceFormula: {
           listPrice: Number(data.current_price_paise) / 100,
-          sellerPayout: Math.round((Number(data.current_price_paise) / 100) * 0.6),
-          commission: Math.round((Number(data.current_price_paise) / 100) * 0.4),
+          sellerPayout: Math.round((Number(data.current_price_paise) / 100) * 0.9),
+          commission: Math.round((Number(data.current_price_paise) / 100) * 0.1),
           depreciation,
           factor,
         },
@@ -384,8 +384,8 @@ function ProductPage() {
   // Custom price formulas
   const priceFormula = product.priceFormula || {
     listPrice: product.originalPrice,
-    sellerPayout: Math.round(product.originalPrice * 0.6),
-    commission: Math.round(product.originalPrice * 0.4),
+    sellerPayout: Math.round(product.originalPrice * 0.9),
+    commission: Math.round(product.originalPrice * 0.1),
     depreciation: 1.0,
     factor: 1.0,
   };

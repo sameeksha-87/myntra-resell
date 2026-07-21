@@ -15,7 +15,7 @@ import {
   ChevronRight,
   Package,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { seedUserOrders, publishListing } from "@/integrations/supabase/actions.server";
@@ -273,10 +273,26 @@ function OrdersPage() {
       .map((l) => l.source_order_item_id),
   );
 
-  const eligibleItems = closetItems.filter(
+  const processedClosetItems = useMemo(() => {
+    return closetItems.map((item) => {
+      const price = Number(item.original_price_paise || 0) / 100;
+      if (price < 3000) {
+        return {
+          ...item,
+          eligibility_decisions: {
+            eligible: false,
+            reason_code: "price_below_minimum_threshold",
+          },
+        };
+      }
+      return item;
+    });
+  }, [closetItems]);
+
+  const eligibleItems = processedClosetItems.filter(
     (i) => i.eligibility_decisions?.eligible && !activeListingItemIds.has(i.id),
   );
-  const ineligibleItems = closetItems.filter((i) => !i.eligibility_decisions?.eligible);
+  const ineligibleItems = processedClosetItems.filter((i) => !i.eligibility_decisions?.eligible);
 
   const getStatusBadge = (status: string) => {
     switch (status) {

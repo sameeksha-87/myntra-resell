@@ -262,6 +262,13 @@ export const createListingDraft = createServerFn({ method: "POST" })
       throw new Error("Unauthorized: Order item does not belong to you");
     }
 
+    const originalPrice = Number(item.original_price_paise || 0) / 100;
+    if (originalPrice < 3000) {
+      throw new Error(
+        "Item is not eligible for resale: Original purchase price must be ₹3,000 or above",
+      );
+    }
+
     const eligibility = item.eligibility_decisions as any;
     if (!eligibility || !eligibility.eligible) {
       throw new Error("Item is not eligible for resale");
@@ -318,13 +325,18 @@ export const createListingDraft = createServerFn({ method: "POST" })
       Math.round(originalPricePaise * depreciationFactor * gradeFactor),
     );
 
-    // Set final listing price to custom price if supplied, else use AI estimated price
-    const listingPricePaise =
+    // Set final listing price to custom price if supplied (capped at original price), else use AI estimated price
+    let listingPricePaise =
       customPrice !== undefined && customPrice !== null
         ? Math.round(customPrice * 100)
         : aiPricePaise;
 
-    const sellerPayoutPaise = Math.round(listingPricePaise * (1 - pricingRules.commission_rate));
+    if (listingPricePaise > originalPricePaise) {
+      listingPricePaise = originalPricePaise;
+    }
+
+    const commissionRate = 0.1;
+    const sellerPayoutPaise = Math.round(listingPricePaise * (1 - commissionRate));
     const commissionPaise = listingPricePaise - sellerPayoutPaise;
 
     const displayTitle = conditionDetails ? `${item.title}|||${conditionDetails}` : item.title;
@@ -827,7 +839,7 @@ export const placeCheckoutOrder = createServerFn({ method: "POST" })
     const price = Number(listing.current_price_paise);
 
     // Configured fees
-    const commissionPaise = Math.round(price * 0.4);
+    const commissionPaise = Math.round(price * 0.1);
     const payoutPaise = price - commissionPaise;
     const buyerFees = 0; // free delivery and buyer protection in prototype
 
@@ -1119,7 +1131,7 @@ export const inspectorSubmitReport = createServerFn({ method: "POST" })
       const revisedPricePaise = Math.round(
         Number(quote.original_price_paise) * factors.depreciationFactor * newFactor,
       );
-      const revisedPayoutPaise = Math.round(revisedPricePaise * 0.6);
+      const revisedPayoutPaise = Math.round(revisedPricePaise * 0.9);
       const revisedCommissionPaise = revisedPricePaise - revisedPayoutPaise;
 
       // Update listing to revision status
@@ -1541,8 +1553,8 @@ export const adminResolveDispute = createServerFn({ method: "POST" })
         released_at: new Date().toISOString(),
       });
 
-      // Move money from Escrow:
-      // Escrow -> Myntra Commission (40%), Escrow -> Seller Payout (60%)
+      // Move money:
+      // holding -> Myntra Commission (10%), holding -> Seller Payout (90%)
       await supabaseAdmin.from("ledger_entries").insert([
         {
           reference_type: "payout_release",

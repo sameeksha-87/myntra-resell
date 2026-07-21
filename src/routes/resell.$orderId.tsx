@@ -42,9 +42,24 @@ export const Route = createFileRoute("/resell/$orderId")({
 type Step = 0 | 1 | 2;
 
 const requiredAngles = [
-  { key: "top", label: "Top View", tip: "Collar, shoulders, or top-down view", required: true },
-  { key: "left", label: "Front View", tip: "Flat lay showing front of the item", required: true },
-  { key: "right", label: "Back View", tip: "Flat lay showing back of the item", required: true },
+  {
+    key: "top",
+    label: "Front / Top View",
+    tip: "Front of clothing or top-down view of shoes",
+    required: true,
+  },
+  {
+    key: "left",
+    label: "Left / Back View",
+    tip: "Back of clothing or left profile of shoes",
+    required: true,
+  },
+  {
+    key: "right",
+    label: "Right / Side View",
+    tip: "Side profile of clothing or right profile of shoes",
+    required: true,
+  },
 ];
 
 const grades: { grade: Grade; blurb: string; example: string }[] = [
@@ -133,6 +148,13 @@ function ResellFlow() {
           return;
         }
 
+        const originalPrice = Number(data.original_price_paise) / 100;
+        if (originalPrice < 3000) {
+          toast.error("Resale is not allowed for items purchased under ₹3,000");
+          navigate({ to: "/orders" });
+          return;
+        }
+
         const o = data.myntra_orders as any;
         const purchaseDate = new Date(o.delivered_at);
         const ageYears = Math.max(
@@ -169,7 +191,7 @@ function ResellFlow() {
     const factor = gradeFactors[grade] || 0.85;
     const depreciation = Math.max(0.2, 1.0 - 0.2 * order.ageYears);
     const listPrice = Math.max(0, Math.round(order.originalPrice * depreciation * factor));
-    const sellerPayout = Math.round(listPrice * 0.6);
+    const sellerPayout = Math.round(listPrice * 0.9);
     const commission = listPrice - sellerPayout;
 
     return {
@@ -183,9 +205,10 @@ function ResellFlow() {
 
   const activePrice = useMemo(() => {
     const aiEstimate = price.listPrice;
-    const listPrice =
+    const rawCustomPrice =
       enteredPrice && !isNaN(Number(enteredPrice)) ? Number(enteredPrice) : aiEstimate;
-    const sellerPayout = Math.round(listPrice * 0.6);
+    const listPrice = order ? Math.min(rawCustomPrice, order.originalPrice) : rawCustomPrice;
+    const sellerPayout = Math.round(listPrice * 0.9);
     const commission = listPrice - sellerPayout;
     return {
       listPrice,
@@ -193,7 +216,7 @@ function ResellFlow() {
       commission,
       aiEstimate,
     };
-  }, [price.listPrice, enteredPrice]);
+  }, [price.listPrice, enteredPrice, order]);
 
   const startVerify = async () => {
     if (!user || !order) return;
@@ -296,9 +319,7 @@ function ResellFlow() {
         return;
       }
 
-      toast.success(
-        `AI Verification Passed! Sharpness: ${Math.round(blurResult.variance)} | Perspective: 93%`,
-      );
+      toast.success("Upload Successful");
       setPhotos((prev) => ({ ...prev, [key]: dataUrl }));
     } catch (err) {
       console.error(err);
@@ -916,19 +937,30 @@ function PhotoStep({
                 placeholder={String(aiEstimate)}
                 value={enteredPrice}
                 onChange={(e) => setEnteredPrice(e.target.value)}
-                className="w-full rounded-md border border-border bg-background py-2 pl-7 pr-3 text-sm font-bold focus:border-primary focus:outline-none"
+                className={`w-full rounded-md border py-2 pl-7 pr-3 text-sm font-bold focus:outline-none ${
+                  enteredPrice && Number(enteredPrice) > order.originalPrice
+                    ? "border-rose-500 bg-rose-50/10 focus:border-rose-500"
+                    : "border-border bg-background focus:border-primary"
+                }`}
               />
             </div>
-            <p className="mt-1.5 text-[11px] text-muted-foreground leading-snug">
-              AI suggests reselling for{" "}
-              <span
-                className="font-bold text-primary cursor-pointer hover:underline"
-                onClick={() => setEnteredPrice(String(aiEstimate))}
-              >
-                ₹{aiEstimate}
-              </span>{" "}
-              based on original price ({inr(order.originalPrice)}) and {grade} condition.
-            </p>
+            {enteredPrice && Number(enteredPrice) > order.originalPrice ? (
+              <p className="mt-1.5 text-[11px] text-rose-600 font-semibold leading-snug">
+                Resale price cannot exceed the original purchase price of {inr(order.originalPrice)}
+                .
+              </p>
+            ) : (
+              <p className="mt-1.5 text-[11px] text-muted-foreground leading-snug">
+                AI suggests reselling for{" "}
+                <span
+                  className="font-bold text-primary cursor-pointer hover:underline"
+                  onClick={() => setEnteredPrice(String(aiEstimate))}
+                >
+                  ₹{aiEstimate}
+                </span>{" "}
+                based on original price ({inr(order.originalPrice)}) and {grade} condition.
+              </p>
+            )}
           </div>
 
           <div className="rounded-md bg-muted/40 p-4 text-xs">
@@ -948,7 +980,9 @@ function PhotoStep({
       <div className="mt-6 flex justify-end">
         <button
           onClick={onContinue}
-          disabled={!requiredDone}
+          disabled={
+            !requiredDone || (enteredPrice ? Number(enteredPrice) > order.originalPrice : false)
+          }
           className="rounded-md bg-primary px-6 py-3 text-sm font-bold uppercase tracking-wide text-primary-foreground disabled:opacity-40 cursor-pointer"
         >
           Verify & Publish Listing ({done}/{requiredAngles.length + optionalSlots.length})
@@ -1111,9 +1145,7 @@ function CameraModal({
           return;
         }
 
-        toast.success(
-          `AI Verification Passed! Sharpness: ${Math.round(blurResult.variance)} | Alignment: 94%`,
-        );
+        toast.success("Upload Successful");
         onCapture(dataUrl);
         setScanning(false);
       }, 1000);

@@ -103,7 +103,7 @@ function Index() {
               {[
                 { icon: ShieldCheck, k: "AI", v: "Verified" },
                 { icon: PackageCheck, k: "48h", v: "Buyer Protection" },
-                { icon: Recycle, k: "60/40", v: "Seller / Myntra" },
+                { icon: Recycle, k: "90/10", v: "Seller / Myntra" },
               ].map((s) => (
                 <div key={s.v} className="rounded-md bg-white/10 p-3 backdrop-blur">
                   <s.icon className="mx-auto h-5 w-5" />
@@ -292,7 +292,7 @@ function Index() {
             </h2>
             <p className="mt-3 max-w-lg text-muted-foreground">
               Pick an eligible order, upload photos with in-app capture guidance, and we handle
-              verification, pickup, doorstep inspection and payout. Keep 60% of the final price.
+              verification, pickup, doorstep inspection and payout. Keep 90% of the final price.
             </p>
             <Link
               to="/orders"

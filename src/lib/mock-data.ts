@@ -166,7 +166,7 @@ export function computePrice(originalPrice: number, ageYears: number, grade: Gra
   const depreciation = 1 - 0.2 * ageYears;
   const factor = gradeFactor[grade];
   const listPrice = Math.max(0, Math.round(originalPrice * depreciation * factor));
-  const sellerPayout = Math.round(listPrice * 0.6);
+  const sellerPayout = Math.round(listPrice * 0.9);
   const commission = listPrice - sellerPayout;
   return {
     listPrice,

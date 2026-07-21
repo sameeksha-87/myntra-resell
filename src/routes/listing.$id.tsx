@@ -495,7 +495,7 @@ function ListingStatus() {
                 isSeller
                   ? order
                     ? order.payout_paise / 100
-                    : (listing.current_price_paise * 0.6) / 100
+                    : (listing.current_price_paise * 0.9) / 100
                   : order
                     ? order.final_price_paise / 100
                     : listing.current_price_paise / 100,
@@ -504,7 +504,7 @@ function ListingStatus() {
 
             <div className="text-xs text-muted-foreground mt-1">
               {isSeller
-                ? `60% of listing price ${inr(order ? order.final_price_paise / 100 : listing.current_price_paise / 100)}`
+                ? `90% of listing price ${inr(order ? order.final_price_paise / 100 : listing.current_price_paise / 100)}`
                 : `Holding ID: txn_${id.slice(0, 6)}`}
             </div>
 
