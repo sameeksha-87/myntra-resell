@@ -31,6 +31,11 @@ const categories = [
     label: "Dresses",
     img: "/dresses.png",
   },
+  {
+    id: "c8ccf46f-2235-4e5e-8905-a792e92716bc",
+    label: "Jeans",
+    img: "/jeans.png",
+  },
 ];
 
 function Index() {
@@ -153,7 +158,7 @@ function Index() {
         <h2 className="text-center text-2xl font-black uppercase tracking-wider">
           Shop by Category
         </h2>
-        <div className="mt-6 grid grid-cols-4 gap-4 max-w-xl mx-auto">
+        <div className="mt-6 grid grid-cols-5 gap-4 max-w-2xl mx-auto">
           {categories.map((c) => (
             <button
               key={c.label}

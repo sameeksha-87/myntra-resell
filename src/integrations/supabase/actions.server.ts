@@ -240,6 +240,14 @@ export const createListingDraft = createServerFn({ method: "POST" })
         title,
         size,
         image,
+        brand_id,
+        brands (
+          name
+        ),
+        category_id,
+        categories (
+          name
+        ),
         myntra_orders (
           id,
           user_id,
@@ -341,13 +349,26 @@ export const createListingDraft = createServerFn({ method: "POST" })
 
     const displayTitle = conditionDetails ? `${item.title}|||${conditionDetails}` : item.title;
 
+    // Resolve dynamic brand and category from database metadata
+    const rawBrand = (item as any).brands?.name || "Zara";
+    let rawCategory = (item as any).categories?.name || "Outerwear";
+    
+    // Map database category taxonomy to frontend categories
+    if (rawCategory === "Sneakers") {
+      rawCategory = "Shoes";
+    } else if (rawCategory === "Denim") {
+      rawCategory = "Jeans";
+    } else if (["Outerwear", "Blazers", "Kids"].includes(rawCategory)) {
+      rawCategory = "Tops";
+    }
+
     // Create draft listing (or update if previously failed/withdrawn)
     const listingData = {
       seller_id: userId,
       source_order_item_id: orderItemId,
       title: displayTitle,
-      brand: "Zara", // Fallback, would fetch brand name normally
-      category: "Outerwear", // Fallback
+      brand: rawBrand,
+      category: rawCategory,
       size: item.size,
       declared_grade: declaredGrade,
       status: "draft",
