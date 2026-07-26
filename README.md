@@ -22,8 +22,9 @@ Instantly imports a user's purchase history (items bought within the last 3 year
 ### AI Verification & Anti-Fraud
 Multi-stage image verification pipeline ensuring that the listed item matches the original purchase:
 1. **EXIF Transposition:** Automatically rotates uploads based on phone camera metadata to prevent layout mismatch.
-2. **SegFormer Clothes Segmentation:** Isolates the garment, removes background clutter/human skin, and crops to the item boundaries.
-3. **OpenCLIP Feature Comparison:** Computes cosine similarity between the catalog photo and the user's cropped smartphone photo to verify it is the correct product.
+2. **YOLO Garment Cropping & rembg Background Stripping:** Detects the clothing item using YOLO to crop around the garment, and uses rembg to isolate it and remove background clutter or skin.
+3. **Visual Embedding Comparison (DINOv2 & OpenCLIP):** Computes cosine similarity between the catalog photo and the user's cropped smartphone photo using DINOv2 (and OpenCLIP fallback) to verify it is the correct product.
+4. **Color & Brand OCR Verification:** Compares HSV color histograms and runs EasyOCR on the image to verify the brand matches and detect potential counterfeits.
 
 ### Smart AI Pricing
 Dynamically estimates resale price based on the brand's tier (Standard/Premium), purchase age (annual depreciation curve), and declared item condition (Pristine, Excellent, Good).
@@ -38,12 +39,12 @@ When an order checkout is completed, the seller’s profile is instantly credite
 
 ## Tech Stack
 
-| Layer | Technologies | Role / Responsibility |
-| :--- | :--- | :--- |
-| **Frontend** | React 19, TypeScript, TailwindCSS v4 | Closet interface, upload wizard, active listings tracking |
-| **Fullstack Backend** | TanStack Start, Vite, Vinxi / Nitro | Server functions, checkout actions, pricing rules engine |
-| **Database & Storage**| Supabase (PostgreSQL), Storage Buckets | Listings states, order items database, uploaded photos storage |
-| **AI Inference Engine** | Python 3, PyTorch, OpenCLIP, SegFormer | Background stripping, EXIF correction, similarity checks |
+| **Layer** | **Technologies** | **Role / Responsibility** |
+|-----------|------------------|---------------------------|
+| **Frontend** | React 19, TypeScript, Tailwind CSS v4 | Responsive user interface, closet management, upload wizard, active listings dashboard |
+| **Full-Stack Backend** | TanStack Start, Vite | Server-side rendering, API routes, server functions, checkout workflow, pricing rules engine |
+| **Database & Storage** | Supabase (PostgreSQL), Supabase Storage Buckets | Store user data, listings, order records, listing states, and uploaded product images |
+| **AI Inference Engine** | Python 3, PyTorch, YOLO (Ultralytics), rembg, DINOv2, OpenCLIP, EasyOCR, OpenCV | Garment detection & cropping, background removal, EXIF orientation correction, visual similarity search, OCR-based brand verification |
 
 ---
 
@@ -65,22 +66,86 @@ graph TD
 
     %% AI Layer
     subgraph AI [AI Verification Engine]
-        Py[Python Controller]
-        Seg[SegFormer Clothes Segmentation]
-        CLIP[OpenCLIP Similarity Check]
+        Py[Python Controller / Daemon]
+        YOLO[Stage 1: YOLO Garment Cropping]
+        Rembg[Stage 2: rembg Background Stripping]
+        Dino[Stage 3: DINOv2 Feature Comparison]
+        Color[Stage 4: HSV Color Correlation]
+        OCR[Stage 5: EasyOCR Brand Verification]
     end
 
     %% Connections
     UI -->|1. Upload Photo| Storage
     UI -->|2. Trigger Verification| SA
-    SA -->|3. Call Script| Py
+    SA -->|3. POST /verify Request| Py
     Py -->|4. Get Images| Storage
-    Py --> Seg
-    Seg -->|5. Isolated Crop| CLIP
-    CLIP -->|6. Similarity Score| Py
-    Py -->|7. Log verification results| DB
-    UI -->|8. User clicks Go Live| SA
-    SA -->|9. Update status to Live| DB
+    
+    Py -->|5. Original & Uploaded Images| YOLO
+    YOLO -->|6. Bounding Box Crops| Rembg
+    YOLO -->|7. Uploaded Crop| OCR
+    
+    Rembg -->|8. Background-Removed Images| Dino
+    Rembg -->|9. Background-Removed Images| Color
+    
+    Dino -->|10. Embedding Similarity Score| Py
+    Color -->|11. Histogram Correlation Score| Py
+    OCR -->|12. Brand Match/Conflict Penalty| Py
+    
+    Py -->|13. Log verification results| DB
+    UI -->|14. User clicks Go Live| SA
+    SA -->|15. Update status to Live| DB
+```
+
+---
+
+## Project Structure
+
+```text
+myntra-resell/
+├── src/                          # Web application source code
+│   ├── components/               # React components
+│   │   ├── ui/                   # Reusable shadcn/Radix UI widgets
+│   │   ├── product-card.tsx      # Listing card component
+│   │   ├── site-header.tsx       # Main header & navigation bar
+│   │   └── trust-badges.tsx      # Badges showing authentication status
+│   ├── hooks/                    # Custom React hooks
+│   ├── integrations/             # Third-party integrations
+│   │   └── supabase/             # Supabase DB client & operations
+│   │       ├── actions.server.ts # Server Functions for listing, DB & AI triggers
+│   │       ├── auth-attacher.ts  # Session propagation utilities
+│   │       ├── auth-middleware.ts# Server authentication guards
+│   │       ├── client.server.ts  # Node-specific Supabase client (service role)
+│   │       ├── client.ts         # Isomorphic frontend Supabase client
+│   │       └── types.ts          # Generated database schema types
+│   ├── lib/                      # Helper libraries & utility functions
+│   ├── routes/                   # File-based TanStack Start routes
+│   │   ├── __root.tsx            # Root application layout
+│   │   ├── index.tsx             # Homepage / public listings feed
+│   │   ├── admin.tsx             # Admin validation dashboard
+│   │   ├── auth.tsx              # Authentication login/signup view
+│   │   ├── bag.tsx               # Shopping cart interface
+│   │   ├── checkout.tsx          # Order placement & Myntra Coin transaction handling
+│   │   ├── listing.$id.tsx       # Single public product details
+│   │   ├── orders.tsx            # Order history details
+│   │   ├── product.$id.tsx       # Purchased catalog items detail view
+│   │   ├── profile.tsx           # User settings & Myntra Coins balance
+│   │   ├── resell.$orderId.tsx   # AI verification, crop wizard, and listing price estimator
+│   │   └── wishlist.tsx          # User's saved listings
+│   ├── router.tsx                # TanStack Start router setup
+│   ├── server.ts                 # Nitro server entrypoint for backend
+│   ├── start.ts                  # Vite client entrypoint for frontend
+│   └── styles.css                # Global CSS styling
+├── supabase/                     # Local Supabase configuration & migrations
+│   ├── migrations/               # PostgreSQL schema & trigger migrations
+│   └── config.toml               # Supabase configuration file
+├── verify_clip_service.py        # Main Python verification daemon server & CLI pipeline
+├── verify.py                     # Initial standalone Python verification script
+├── best.pt / yolov8n.pt          # Pre-loaded YOLO weights for garment crop
+├── package.json                  # Javascript package metadata & scripts
+├── bun.lock                      # Bun lockfile for Javascript dependencies
+├── tsconfig.json                 # TypeScript compiler configuration
+├── vite.config.ts                # Vite & Vinxi configuration file
+└── README.md                     # Project documentation
 ```
 
 ---
@@ -119,7 +184,7 @@ graph TD
    ```
 2. Install Python dependencies:
    ```bash
-   pip install torch torchvision open-clip-torch transformers numpy pillow
+   pip install torch torchvision open-clip-torch transformers numpy pillow ultralytics rembg easyocr opencv-python
    ```
 3. Run a test validation script locally:
    ```bash
@@ -130,6 +195,9 @@ graph TD
 
 ## Future Roadmap
 
-* **AI Wear-and-Tear Detection:** Automatically grading the condition (Pristine/Good/Fair) by analyzing fabric pills, tears, and discoloration.
-* **Logistics pickup integration:** Quality checks executed by delivery partners at the doorstep via a simplified companion app synced to our AI checks.
-* **AI Visual Search:** Enabling buyers to upload a photo to find visually similar pre-loved clothes listed on the marketplace.
+| Phase | Features |
+|-------|----------|
+| **Phase 1** | One-click listings, AI Smart Valuation, AI Verification, Secure Wallet Payments |
+| **Phase 2** | Fabric & Stitching Verification, Enhanced Counterfeit Detection |
+| **Phase 3** | AI Style Recommendations, Personalized Wallet Credit Offers |
+| **Phase 4** | Cross-Brand Circular Marketplace, Category Expansion, Sustainability Dashboard |
