@@ -1,234 +1,135 @@
-# 👕 ReSell by Myntra
+# ReSell by Myntra
 
-> An AI-powered circular fashion marketplace that enables users to seamlessly resell verified Myntra purchases while promoting sustainable fashion.
+[![Tech Stack](https://img.shields.io/badge/Stack-React%20%7C%20TypeScript%20%7C%20Tailwind%20%7C%20Supabase%20%7C%20Python-ff3f6c?style=for-the-badge)](https://github.com/sameeksha-87/myntra-resell)
+[![Build Status](https://img.shields.io/badge/Build-Passing-14958f?style=for-the-badge)](https://github.com/sameeksha-87/myntra-resell)
 
----
-
-## 🚀 Overview
-
-ReSell by Myntra transforms post-purchase fashion into a circular economy.
-
-Instead of letting clothes remain unused, users can instantly list previously purchased Myntra products for resale. By leveraging purchase history, AI-powered verification, and smart pricing, ReSell creates a trusted and frictionless resale experience entirely within the Myntra ecosystem.
+An AI-powered, closed-loop circular fashion marketplace built directly into the Myntra ecosystem. ReSell allows users to instantly list their authenticated past purchases for resale, using computer vision to verify item authenticity and condition, and crediting earnings as Myntra Coins to keep capital flowing within Myntra.
 
 ---
 
-## 🎯 Problem Statement
+## Value Proposition
 
-Millions of garments purchased online remain unused after only a few wears.
-
-Existing resale platforms suffer from:
-
-- Manual listing process
-- Lack of purchase verification
-- Pricing uncertainty
-- Trust issues between buyers and sellers
-- Fragmented user experience
-
-As a result, users hesitate to resell while valuable products remain idle.
+* **For Customers:** One-click listings with zero manual data entry, guaranteed authenticity for buyers, and instant liquidity in Myntra Coins.
+* **For Myntra:** 100% customer retention (Myntra Coins lock spending on-platform), a new 10% transactional commission stream, and leadership in sustainable, circular commerce.
 
 ---
 
-## 💡 Our Solution
+## Key Features
 
-**AI-powered resale marketplace** built into Myntra
+### Closet Sync
+Instantly imports a user's purchase history (items bought within the last 3 years over ₹3,000) into a "Resell Closet". Eliminates the friction of writing titles, uploading stock photos, or guessing sizes.
 
-Key innovations include:
+### AI Verification & Anti-Fraud
+Multi-stage image verification pipeline ensuring that the listed item matches the original purchase:
+1. **EXIF Transposition:** Automatically rotates uploads based on phone camera metadata to prevent layout mismatch.
+2. **SegFormer Clothes Segmentation:** Isolates the garment, removes background clutter/human skin, and crops to the item boundaries.
+3. **OpenCLIP Feature Comparison:** Computes cosine similarity between the catalog photo and the user's cropped smartphone photo to verify it is the correct product.
 
-- 📦 Closet Sync from purchase history
-- 🤖 AI-powered authenticity verification
-- 💰 Smart resale price prediction
-- 📸 Automatic listing generation
-- 💳 Myntra Wallet integration
-- 🌱 Circular fashion ecosystem
+### Smart AI Pricing
+Dynamically estimates resale price based on the brand's tier (Standard/Premium), purchase age (annual depreciation curve), and declared item condition (Pristine, Excellent, Good).
 
----
+### Verified Drafts & "Go Live"
+Sellers control when their listings go live. AI verification saves the listing as a hidden "Verified Draft", keeping it off the public marketplace until the seller explicitly clicks the "Go Live" button.
 
-## ✨ Features
-
-### 👕 Closet Sync
-
-Automatically imports eligible Myntra purchases for resale.
-
----
-
-### 🤖 AI Verification Pipeline
-
-Our AI pipeline analyses uploaded product images using:
-
-- Background Removal
-- YOLO Object Detection
-- OCR
-- DINO Feature Matching
-
-This verifies:
-
-- Correct product
-- Brand consistency
-- Visual similarity
-- Image quality
+### Myntra Coins Payout
+When an order checkout is completed, the seller’s profile is instantly credited with Myntra Coins (virtual currency) and sent a notification, creating a closed-loop marketplace.
 
 ---
 
-### 💰 Smart Pricing
+## Tech Stack
 
-Predicts a fair resale price using:
-
-- Original purchase price
-- Condition
-- Age of purchase
-
----
-
-### 📝 One-Click Listing
-
-Automatically generates:
-
-- Product title
-- Description
-- Images
-- Suggested price
-
-Reducing listing time from minutes to seconds.
+| Layer | Technologies | Role / Responsibility |
+| :--- | :--- | :--- |
+| **Frontend** | React 19, TypeScript, TailwindCSS v4 | Closet interface, upload wizard, active listings tracking |
+| **Fullstack Backend** | TanStack Start, Vite, Vinxi / Nitro | Server functions, checkout actions, pricing rules engine |
+| **Database & Storage**| Supabase (PostgreSQL), Storage Buckets | Listings states, order items database, uploaded photos storage |
+| **AI Inference Engine** | Python 3, PyTorch, OpenCLIP, SegFormer | Background stripping, EXIF correction, similarity checks |
 
 ---
 
-### 💳 Wallet Integration
+## System Architecture & Flow
 
-After every successful resale:
+```mermaid
+graph TD
+    %% Frontend Layer
+    subgraph Client [Client / Frontend]
+        UI[React + TanStack Start UI]
+    end
 
-- Seller receives Myntra Wallet credits
-- Credits can be used for future purchases
-- Creates a closed-loop shopping ecosystem
+    %% Backend Layer
+    subgraph Backend [Backend & Storage]
+        SA[Server Actions]
+        DB[(Supabase PostgreSQL)]
+        Storage[(Supabase Object Storage)]
+    end
 
----
+    %% AI Layer
+    subgraph AI [AI Verification Engine]
+        Py[Python Controller]
+        Seg[SegFormer Clothes Segmentation]
+        CLIP[OpenCLIP Similarity Check]
+    end
 
-## 🏗️ System Architecture
-
-```
-User
-   │
-   ▼
-Closet Sync
-   │
-   ▼
-AI Verification Pipeline
-   │
-   ├── Background Removal
-   ├── YOLO Detection
-   ├── OCR
-   └── DINO Similarity
-   │
-   ▼
-Smart Pricing
-   │
-   ▼
-Verified Listing
-   │
-   ▼
-Myntra Marketplace
+    %% Connections
+    UI -->|1. Upload Photo| Storage
+    UI -->|2. Trigger Verification| SA
+    SA -->|3. Call Script| Py
+    Py -->|4. Get Images| Storage
+    Py --> Seg
+    Seg -->|5. Isolated Crop| CLIP
+    CLIP -->|6. Similarity Score| Py
+    Py -->|7. Log verification results| DB
+    UI -->|8. User clicks Go Live| SA
+    SA -->|9. Update status to Live| DB
 ```
 
 ---
 
-## 🛠️ Tech Stack
+## Developer Setup & Installation
 
-### Frontend
+### Prerequisites
+* **Node.js** (v18+) or **Bun** (Recommended)
+* **Python** (3.9+) with `pip`
 
-- React.js
-- TypeScript
-- Tailwind CSS
+### 1. Web Application Setup
+1. Clone the repository and navigate to the directory:
+   ```bash
+   git clone git@github.com:sameeksha-87/myntra-resell.git
+   cd myntra-resell
+   ```
+2. Install Javascript dependencies:
+   ```bash
+   bun install  # or npm install
+   ```
+3. Set up environment variables in a `.env` file in the root:
+   ```env
+   SUPABASE_URL=your_supabase_project_url
+   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+   ```
+4. Start the development server:
+   ```bash
+   bun run dev
+   ```
 
-### Backend
-
-- FastAPI
-- Python
-
-### AI / ML
-
-- YOLO
-- OCR
-- DINO
-- OpenCV
-
-### Database
-
-- PostgreSQL
-
----
-
-## 📊 Business Model
-
-Revenue is generated through:
-
-- **10% commission** on every successful resale
-- Increased customer retention through Myntra Wallet credits
-- Higher Customer Lifetime Value (CLV)
-
----
-
-## 🌍 Market Opportunity
-
-- 🌎 **$393B** Global second-hand apparel market by 2030
-- 📈 **70%+** market growth driven by Gen Z & Millennials
-- ♻ Growing adoption of circular fashion
-
-**Source:** GlobalData via ThredUp 2026 Resale Report.
+### 2. AI Service Setup
+1. Create and activate a Python virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows use: venv\Scripts\activate
+   ```
+2. Install Python dependencies:
+   ```bash
+   pip install torch torchvision open-clip-torch transformers numpy pillow
+   ```
+3. Run a test validation script locally:
+   ```bash
+   python verify_clip_service.py db_orig.jpg db_upl.jpg
+   ```
 
 ---
 
-## 🎯 Impact
+## Future Roadmap
 
-### For Users
-
-- Faster resale
-- Trusted listings
-- Better pricing
-- Sustainable shopping
-
-### For Myntra
-
-- New revenue stream
-- Increased customer retention
-- Closed-loop commerce
-- Stronger circular fashion ecosystem
-
----
-
-## 🔮 Future Roadmap
-
-### Phase 1
-
-Dynamic AI Pricing
-
-### Phase 2
-
-Fabric & Quality Intelligence
-
-### Phase 3
-
-AI Style Recommendations
-
-### Phase 4
-
-Cross-Brand Circular Marketplace
-
----
-
-## 📸 Demo Workflow
-
-1. Login
-2. Closet Sync imports previous purchases
-3. Select an item
-4. AI verifies uploaded images
-5. Smart pricing recommends resale value
-6. Listing is published
-7. Product is sold
-8. Seller receives Myntra Wallet credits
-
----
-
-## 👥 Team
-
-Built as part of the **Myntra Hackathon**.
-
----
+* **AI Wear-and-Tear Detection:** Automatically grading the condition (Pristine/Good/Fair) by analyzing fabric pills, tears, and discoloration.
+* **Logistics pickup integration:** Quality checks executed by delivery partners at the doorstep via a simplified companion app synced to our AI checks.
+* **AI Visual Search:** Enabling buyers to upload a photo to find visually similar pre-loved clothes listed on the marketplace.
