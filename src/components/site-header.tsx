@@ -80,14 +80,7 @@ export function SiteHeader() {
           </Link>
         </nav>
 
-        <div className="ml-auto flex flex-1 items-center gap-4 md:flex-none">
-          <div className="relative flex-1 md:w-80 md:flex-none">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              placeholder="Search for pre-loved brands, styles..."
-              className="h-10 w-full rounded-md bg-muted pl-9 pr-3 text-sm outline-none ring-primary/20 focus:bg-background focus:ring-2"
-            />
-          </div>
+        <div className="ml-auto flex items-center gap-4">
 
           <div className="relative hidden md:block" ref={menuRef}>
             {user ? (

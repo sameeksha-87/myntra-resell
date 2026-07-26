@@ -1759,7 +1759,9 @@ export const fetchListings = createServerFn({ method: "GET" })
     }
     if (brand) query = query.eq("brand", brand);
     if (size) query = query.eq("size", size);
-    if (search) query = query.ilike("title", `%${search}%`);
+    if (search) {
+      query = query.or(`title.ilike.%${search}%,brand.ilike.%${search}%`);
+    }
 
     if (priceSort) {
       query = query.order("current_price_paise", { ascending: priceSort === "asc" });
