@@ -12,29 +12,28 @@ export const Route = createFileRoute("/")({
 
 const categories = [
   {
-    id: "5f163d0f-8e56-4003-b58e-370699d792df",
-    label: "Shoes",
-    img: "/shoes.png",
-  },
-  {
-    id: "b0b2c21b-4b96-4004-a849-f0176da0867c",
-    label: "Bags",
-    img: "/bags.png",
+    id: "c8ccf46f-2235-4e5e-8905-a792e92716bc",
+    label: "Jeans",
+    emoji: "👖",
+    img: "/jeans.png",
   },
   {
     id: "f17caa0a-b689-4d1c-a434-34abfc366c0f",
     label: "Tops",
+    emoji: "👚",
     img: "/tops.png",
   },
   {
     id: "d00000e2-675e-41a5-8220-d40b9ddf67d0",
     label: "Dresses",
+    emoji: "👗",
     img: "/dresses.png",
   },
   {
-    id: "c8ccf46f-2235-4e5e-8905-a792e92716bc",
-    label: "Jeans",
-    img: "/jeans.png",
+    id: "5f163d0f-8e56-4003-b58e-370699d792df",
+    label: "Shoes",
+    emoji: "👟",
+    img: "/shoes.png",
   },
 ];
 
@@ -86,10 +85,12 @@ function Index() {
               Pre-loved fashion,
               <br /> Myntra-approved.
             </h1>
-            <p className="mt-4 max-w-md text-white/85">
+            <p className="mt-4 max-w-md text-white/85 text-sm md:text-base">
               Every listing is AI Verified against original purchase records and Doorstep Inspected
               before delivery. Great brands, honest grades, zero surprises.
             </p>
+
+
             <div className="mt-6 flex flex-wrap gap-3">
               <a
                 href="#feed"
@@ -104,32 +105,46 @@ function Index() {
                 Resell your Myntra order
               </Link>
             </div>
-            <div className="mt-8 grid max-w-md grid-cols-3 gap-4 text-center">
-              {[
-                { icon: ShieldCheck, k: "AI", v: "Verified" },
-                { icon: PackageCheck, k: "48h", v: "Buyer Protection" },
-                { icon: Recycle, k: "90/10", v: "Seller / Myntra" },
-              ].map((s) => (
-                <div key={s.v} className="rounded-md bg-white/10 p-3 backdrop-blur">
-                  <s.icon className="mx-auto h-5 w-5" />
-                  <div className="mt-1 text-lg font-black">{s.k}</div>
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-white/80">
-                    {s.v}
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
+          
+          {/* Category image cards (redesigned hero) */}
           <div className="relative">
-            <div className="grid grid-cols-2 gap-3">
-              {products.slice(0, 4).map((p, i) => (
-                <img
-                  key={p.id}
-                  src={p.image}
-                  alt={p.title}
-                  className={`aspect-[4/5] w-full rounded-md object-cover shadow-card ${i % 2 ? "translate-y-6" : ""}`}
-                />
-              ))}
+            <div className="grid grid-cols-2 gap-4">
+              {categories.map((c) => {
+                const isSelected = selectedCategory === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => handleCategoryClick(c.id)}
+                    className={`relative aspect-[4/5] w-full rounded-lg overflow-hidden shadow-card group transition-all duration-300 transform hover:-translate-y-1 text-left border ${
+                      isSelected
+                        ? "border-white ring-4 ring-primary ring-offset-2 ring-offset-zinc-900 scale-[1.03]"
+                        : "border-white/10 hover:border-white/30"
+                    }`}
+                  >
+                    <img
+                      src={c.img}
+                      alt={c.label}
+                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    {/* Gradient overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/80 via-transparent to-transparent transition-opacity group-hover:from-zinc-950/90" />
+                    
+                    {/* Floating emoji + category title */}
+                    <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
+                      <span className="text-xl inline-block transition-transform group-hover:scale-110 duration-300">
+                        {c.emoji}
+                      </span>
+                      <h3 className="mt-1 font-display text-sm font-black uppercase tracking-wider">
+                        {c.label}
+                      </h3>
+                      <p className="text-[9px] text-white/70 uppercase tracking-widest font-bold mt-0.5 group-hover:text-primary transition-colors">
+                        Browse collection →
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -152,33 +167,6 @@ function Index() {
           </span>
         </div>
       </div>
-
-      {/* Categories */}
-      <section className="mx-auto max-w-7xl px-6 py-10">
-        <h2 className="text-center text-2xl font-black uppercase tracking-wider">
-          Shop by Category
-        </h2>
-        <div className="mt-6 grid grid-cols-5 gap-4 max-w-2xl mx-auto">
-          {categories.map((c) => (
-            <button
-              key={c.label}
-              onClick={() => handleCategoryClick(c.id)}
-              className={`group flex flex-col items-center cursor-pointer transition-all duration-200 ${selectedCategory === c.id ? "scale-105" : ""}`}
-            >
-              <div
-                className={`aspect-square w-20 overflow-hidden rounded-full border-2 ${selectedCategory === c.id ? "border-primary shadow-lg scale-105" : "border-transparent group-hover:border-primary/50"}`}
-              >
-                <img src={c.img} alt={c.label} className="h-full w-full object-cover" />
-              </div>
-              <span
-                className={`mt-2 text-xs font-bold uppercase ${selectedCategory === c.id ? "text-primary font-black" : "text-foreground"}`}
-              >
-                {c.label}
-              </span>
-            </button>
-          ))}
-        </div>
-      </section>
 
       {/* Feed */}
       <section id="feed" className="mx-auto max-w-7xl px-4 pb-16 md:px-6 scroll-mt-20">

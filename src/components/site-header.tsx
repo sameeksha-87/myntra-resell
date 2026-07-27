@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Search, Heart, ShoppingBag, User, Sparkles, LogOut } from "lucide-react";
+import { Heart, ShoppingBag, User, Sparkles, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -80,8 +80,7 @@ export function SiteHeader() {
           </Link>
         </nav>
 
-        <div className="ml-auto flex items-center gap-4">
-
+        <div className="ml-auto flex flex-1 items-center gap-4 md:flex-none">
           <div className="relative hidden md:block" ref={menuRef}>
             {user ? (
               <>

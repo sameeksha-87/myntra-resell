@@ -1,5 +1,5 @@
 // src/routes/resell.$orderId.tsx
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { inr, type Grade } from "@/lib/mock-data";
 import { useEffect, useMemo, useState, useRef } from "react";
@@ -29,7 +29,23 @@ import {
   publishListing,
 } from "@/integrations/supabase/actions.server";
 
+const imageUrlToBase64 = async (url: string): Promise<string> => {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
+
+type ResellSearch = { relistFrom?: string };
+
 export const Route = createFileRoute("/resell/$orderId")({
+  validateSearch: (s: Record<string, unknown>): ResellSearch => ({
+    relistFrom: typeof s.relistFrom === "string" ? s.relistFrom : undefined,
+  }),
   loader: ({ params }) => {
     return { orderItemId: params.orderId };
   },
@@ -82,6 +98,8 @@ const grades: { grade: Grade; blurb: string; example: string }[] = [
 
 function ResellFlow() {
   const { orderItemId } = Route.useLoaderData();
+  const search = Route.useSearch();
+  const relistFrom = search.relistFrom;
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const [step, setStep] = useState<Step>(0);
@@ -101,6 +119,7 @@ function ResellFlow() {
   // Loaded DB Order Item details
   const [order, setOrder] = useState<any>(null);
   const [orderLoading, setOrderLoading] = useState(true);
+  const [relistLoading, setRelistLoading] = useState(false);
 
   const [activeAngle, setActiveAngle] = useState<string | null>(null);
   const [scanningAngle, setScanningAngle] = useState<string | null>(null);
@@ -181,6 +200,61 @@ function ResellFlow() {
       });
   }, [orderItemId, user]);
 
+  useEffect(() => {
+    if (!user || !relistFrom) return;
+    setRelistLoading(true);
+    supabase
+      .from("listings")
+      .select(`
+        id,
+        title,
+        brand,
+        size,
+        current_price_paise,
+        declared_grade,
+        category,
+        listing_media (
+          storage_key,
+          angle
+        )
+      `)
+      .eq("id", relistFrom)
+      .single()
+      .then(async ({ data, error }) => {
+        if (error || !data) {
+          toast.error("Failed to load previous listing details for relisting");
+          setRelistLoading(false);
+          return;
+        }
+
+        setGrade(data.declared_grade as Grade);
+        setEnteredPrice((data.current_price_paise / 100).toString());
+        
+        const parts = (data.title || "").split("|||");
+        if (parts.length > 1) {
+          setConditionDetails(parts[1]);
+        }
+
+        const media = data.listing_media || [];
+        const loadedPhotos: Record<string, string> = {};
+        for (const m of media) {
+          const publicUrl = `${(supabase as any).supabaseUrl}/storage/v1/object/public/resell-photos/${m.storage_key}`;
+          try {
+            const base64Data = await imageUrlToBase64(publicUrl);
+            loadedPhotos[m.angle || "top"] = base64Data;
+          } catch (e) {
+            console.error("Failed to convert image to base64:", e);
+          }
+        }
+        setPhotos(loadedPhotos);
+        setRelistLoading(false);
+      })
+      .catch((e) => {
+        console.error("Relist load error:", e);
+        setRelistLoading(false);
+      });
+  }, [relistFrom, user]);
+
   const photosDone = Object.keys(photos).length;
 
   const price = useMemo(() => {
@@ -233,6 +307,7 @@ function ResellFlow() {
           declaredGrade: grade,
           customPrice: enteredPrice ? Number(enteredPrice) : undefined,
           conditionDetails: conditionDetails || undefined,
+          relistFrom: relistFrom || undefined,
         },
       });
       const currentListingId = draftResult.listingId;
@@ -401,13 +476,15 @@ function ResellFlow() {
     }
   };
 
-  if (orderLoading) {
+  if (orderLoading || relistLoading) {
     return (
       <div className="min-h-screen bg-background">
         <SiteHeader />
         <div className="flex flex-col items-center justify-center py-32 gap-3">
           <Loader2 className="h-8 w-8 text-primary animate-spin" />
-          <p className="text-sm text-muted-foreground">Loading order details...</p>
+          <p className="text-sm text-muted-foreground font-semibold">
+            {relistLoading ? "Importing previous listing details & media..." : "Loading order details..."}
+          </p>
         </div>
         <SiteFooter />
       </div>
