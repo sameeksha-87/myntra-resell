@@ -24,7 +24,54 @@ export type Product = {
   size: string;
 };
 
-const img = (seed: string) => `https://picsum.photos/seed/resell-${seed}/600/750`;
+const imageMap: Record<string, string> = {
+  // Zara Oversized Wool Blend Coat
+  "coat-1": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=600&h=750",
+  "coat-1b": "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&q=80&w=600&h=750",
+  "coat-1c": "https://images.unsplash.com/photo-1485462537746-965f33f7f6a7?auto=format&fit=crop&q=80&w=600&h=750",
+  "coat-1d": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600&h=750",
+
+  // Tommy Hilfiger Slim Fit Cotton Shirt
+  "shirt-2": "https://images.unsplash.com/photo-1618354691373-d851c5c3a990?auto=format&fit=crop&q=80&w=600&h=750",
+  "shirt-2b": "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&q=80&w=600&h=750",
+  "shirt-2c": "https://images.unsplash.com/photo-1621072156002-e2fcc103e869?auto=format&fit=crop&q=80&w=600&h=750",
+
+  // Nike Air Zoom Pegasus 40
+  "shoe-3": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=600&h=750",
+  "shoe-3b": "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&q=80&w=600&h=750",
+  "shoe-3c": "https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&q=80&w=600&h=750",
+
+  // H&M Ribbed Knit Midi Dress
+  "dress-4": "https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&q=80&w=600&h=750",
+  "dress-4b": "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?auto=format&fit=crop&q=80&w=600&h=750",
+
+  // Levi's 511 Slim Fit Jeans
+  "jeans-5": "https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&q=80&w=600&h=750",
+  "jeans-5b": "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&q=80&w=600&h=750",
+
+  // Mango Linen Blazer
+  "blazer-6": "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&q=80&w=600&h=750",
+  "blazer-6b": "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=600&h=750",
+
+  // Adidas Ultraboost 22 Running
+  "shoe-7": "https://images.unsplash.com/photo-1587563871167-1ee9c731aefb?auto=format&fit=crop&q=80&w=600&h=750",
+  "shoe-7b": "https://images.unsplash.com/photo-1460353581641-37baddab0fa2?auto=format&fit=crop&q=80&w=600&h=750",
+
+  // Vero Moda Floral Wrap Dress
+  "dress-8": "https://images.unsplash.com/photo-1609357605129-26f69add5d6e?auto=format&fit=crop&q=80&w=600&h=750",
+  "dress-8b": "https://images.unsplash.com/photo-1518049368264-734d3ad45e2a?auto=format&fit=crop&q=80&w=600&h=750",
+
+  // Order Items
+  "order-101": "https://images.unsplash.com/photo-1548883354-7622d03aca27?auto=format&fit=crop&q=80&w=600&h=750",
+  "order-102": "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&q=80&w=600&h=750",
+  "order-103": "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&q=80&w=600&h=750",
+  "order-104": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&q=80&w=600&h=750",
+  "order-105": "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&q=80&w=600&h=750"
+};
+
+const img = (seed: string) => {
+  return imageMap[seed] || `https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&q=80&w=600&h=750`;
+};
 
 export const products: Product[] = [
   {
