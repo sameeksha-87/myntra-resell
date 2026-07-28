@@ -10,7 +10,7 @@ An AI-powered, closed-loop circular fashion marketplace built directly into the 
 ## Live Demo
 
 The web application is deployed and publicly accessible at:
-👉 **[https://myntra-resell.political-shawl.workers.dev](https://myntra-resell.political-shawl.workers.dev)**
+👉 **[https://myntra-resell.confusion-omelet.workers.dev](https://myntra-resell.confusion-omelet.workers.dev)**
 
 *Note: Since the serverless environment on Cloudflare cannot execute the Python-based machine learning pipeline locally, image verification on the live URL will default to verification pending/failed. For a live demonstration of the full AI authenticity verification (including YOLO object detection, background removal, and DINOv2 visual similarity matching), please refer to the Local Setup instructions below.*
 
@@ -53,57 +53,19 @@ When an order checkout is completed, the seller’s profile is instantly credite
 | **Frontend** | React 19, TypeScript, Tailwind CSS v4 | Responsive user interface, closet management, upload wizard, active listings dashboard |
 | **Full-Stack Backend** | TanStack Start, Vite | Server-side rendering, API routes, server functions, checkout workflow, pricing rules engine |
 | **Database & Storage** | Supabase (PostgreSQL), Supabase Storage Buckets | Store user data, listings, order records, listing states, and uploaded product images |
-| **AI Inference Engine** | Python 3, PyTorch, YOLO (Ultralytics), rembg, DINOv2, OpenCLIP, EasyOCR, OpenCV | Garment detection & cropping, background removal, EXIF orientation correction, visual similarity search, OCR-based brand verification |
+| **AI Inference Engine** | Python 3, PyTorch, YOLO (Ultralytics), rembg, DINOv2, EasyOCR, OpenCV | Garment detection & cropping, background removal, EXIF orientation correction, visual similarity search, OCR-based brand verification |
 
 ---
 
 ## System Architecture & Flow
 
-```mermaid
-graph TD
-    %% Frontend Layer
-    subgraph Client [Client / Frontend]
-        UI[React + TanStack Start UI]
-    end
+![System Architecture & Flow](./system_architecture.jpg)
 
-    %% Backend Layer
-    subgraph Backend [Backend & Storage]
-        SA[Server Actions]
-        DB[(Supabase PostgreSQL)]
-        Storage[(Supabase Object Storage)]
-    end
-
-    %% AI Layer
-    subgraph AI [AI Verification Engine]
-        Py[Python Controller / Daemon]
-        YOLO[Stage 1: YOLO Garment Cropping]
-        Rembg[Stage 2: rembg Background Stripping]
-        Dino[Stage 3: DINOv2 Feature Comparison]
-        Color[Stage 4: HSV Color Correlation]
-        OCR[Stage 5: EasyOCR Brand Verification]
-    end
-
-    %% Connections
-    UI -->|1. Upload Photo| Storage
-    UI -->|2. Trigger Verification| SA
-    SA -->|3. POST /verify Request| Py
-    Py -->|4. Get Images| Storage
-    
-    Py -->|5. Original & Uploaded Images| YOLO
-    YOLO -->|6. Bounding Box Crops| Rembg
-    YOLO -->|7. Uploaded Crop| OCR
-    
-    Rembg -->|8. Background-Removed Images| Dino
-    Rembg -->|9. Background-Removed Images| Color
-    
-    Dino -->|10. Embedding Similarity Score| Py
-    Color -->|11. Histogram Correlation Score| Py
-    OCR -->|12. Brand Match/Conflict Penalty| Py
-    
-    Py -->|13. Log verification results| DB
-    UI -->|14. User clicks Go Live| SA
-    SA -->|15. Update status to Live| DB
-```
+The application handles verification using a 4-stage pipelined background daemon:
+1. **YOLOv8** extracts the bounding box of the garment, cropping out background noise.
+2. **rembg** isolates the product by removing background pixels (e.g. hangers, walls, flooring).
+3. **DINOv2** computes high-dimensional embeddings of the stock and user photos, assessing visual similarity via cosine distance.
+4. **EasyOCR** scans the collar tag for text validation to confirm the seller's brand claims.
 
 ---
 
