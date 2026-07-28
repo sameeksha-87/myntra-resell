@@ -59,7 +59,47 @@ When an order checkout is completed, the seller’s profile is instantly credite
 
 ## System Architecture & Flow
 
-![System Architecture & Flow](./system_architecture.jpg)
+```mermaid
+graph TD
+    %% Frontend Layer
+    subgraph Client [Client / Frontend]
+        UI[React + TanStack Start UI]
+    end
+
+    %% Backend Layer
+    subgraph Backend [Backend & Storage]
+        SA[Server Actions]
+        DB[(Supabase PostgreSQL)]
+        Storage[(Supabase Object Storage)]
+    end
+
+    %% AI Layer
+    subgraph AI [AI Verification Engine]
+        Py[Python Controller]
+        YOLO[1. YOLOv8 Garment Detection & Crop]
+        Rembg[2. rembg Background Removal]
+        Dino[3. DINOv2 Feature Similarity Check]
+        OCR[4. EasyOCR Brand Tag Verification]
+    end
+
+    %% Connections
+    UI -->|1. Upload Photo| Storage
+    UI -->|2. Trigger Verification| SA
+    SA -->|3. Call Service| Py
+    Py -->|4. Fetch Images| Storage
+    
+    Py -->|5. Run Pipeline| YOLO
+    YOLO -->|6. Cropped Garment| Rembg
+    Rembg -->|7. Background-Removed Crop| Dino
+    Rembg -->|8. Collar Tag Region| OCR
+    
+    Dino -->|9. Cosine Similarity Score| Py
+    OCR -->|10. Brand Match Result| Py
+    
+    Py -->|11. Log verification results| DB
+    UI -->|12. User clicks Go Live| SA
+    SA -->|13. Update status to Live| DB
+```
 
 The application handles verification using a 4-stage pipelined background daemon:
 1. **YOLOv8** extracts the bounding box of the garment, cropping out background noise.
