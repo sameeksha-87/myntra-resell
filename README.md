@@ -10,7 +10,7 @@ An AI-powered, closed-loop circular fashion marketplace built directly into the 
 ## Live Demo
 
 The web application is deployed and publicly accessible at:
-👉 **[https://myntra-resell.glib-respect.workers.dev](https://myntra-resell.glib-respect.workers.dev)**
+👉 **[https://myntra-resell.muffins-myntra-resell.workers.dev](https://myntra-resell.muffins-myntra-resell.workers.dev)**
 
 *Note: Since the serverless environment on Cloudflare cannot execute the Python-based machine learning pipeline locally, image verification on the live URL will default to verification pending/failed. For a live demonstration of the full AI authenticity verification (including YOLO object detection, background removal, and DINOv2 visual similarity matching), please refer to the Local Setup instructions below.*
 
