@@ -674,8 +674,8 @@ function ProductPage() {
               />
               <div className="my-2 border-t border-border" />
               <Row label="Final listing price" value={inr(priceFormula.listPrice)} bold />
-              <Row label="Seller receives (60%)" value={inr(priceFormula.sellerPayout)} />
-              <Row label="Myntra commission (40%)" value={inr(priceFormula.commission)} />
+              <Row label="Seller receives (90%)" value={inr(priceFormula.sellerPayout)} />
+              <Row label="Myntra commission (10%)" value={inr(priceFormula.commission)} />
             </div>
           </details>
         </div>
