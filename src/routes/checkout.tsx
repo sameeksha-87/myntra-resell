@@ -331,7 +331,7 @@ function CheckoutPage() {
               {!showNewAddressForm && savedAddresses.length > 0 && (
                 <div className="mt-4">
                   <div className="grid gap-3">
-                    {savedAddresses.map((addr) => (
+                    {savedAddresses.slice(0, 1).map((addr) => (
                       <label
                         key={addr.id}
                         className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer transition ${

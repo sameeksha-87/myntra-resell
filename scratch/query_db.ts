@@ -27,38 +27,16 @@ const supabase = createClient(
 );
 
 async function main() {
-  const orderIds = ["8fa57639-3328-41b3-9827-032673d4bcb2", "6dc0f76a-7fad-47e7-baec-d48a89ef69e2"];
-  const listingIds = ["2265ac24-f3a2-4caf-9f2a-de8ffbc55569", "2e6263c1-f152-47a5-baa4-15cb225b8ecb"];
+  const { data: addresses, error } = await supabase
+    .from("addresses")
+    .select("*");
 
-  // Check payment_transactions
-  const { data: payTx } = await supabase
-    .from("payment_transactions")
-    .select("id, order_id, type, status")
-    .in("order_id", orderIds);
-  console.log("=== payment_transactions ===", payTx);
-
-  // Check ledger_entries
-  const { data: ledger } = await supabase
-    .from("ledger_entries")
-    .select("id, reference_id, reference_type")
-    .in("reference_id", orderIds);
-  console.log("=== ledger_entries ===", ledger);
-
-  // Check seller_payouts
-  const { data: payouts } = await supabase
-    .from("seller_payouts")
-    .select("id, order_id, status")
-    .in("order_id", orderIds);
-  console.log("=== seller_payouts ===", payouts);
-
-  // Check pickup_jobs
-  const { data: pickups } = await supabase
-    .from("pickup_jobs")
-    .select("id, listing_id, status")
-    .in("listing_id", listingIds);
-  console.log("=== pickup_jobs ===", pickups);
+  console.log("=== ADDRESSES ===");
+  if (error) console.error("Error:", error);
+  else console.log(addresses);
 }
 
 main().catch(console.error);
+
 
 
