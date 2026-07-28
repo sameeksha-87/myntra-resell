@@ -15,11 +15,13 @@ import {
   Loader2,
   Trash2,
   Sliders,
+  XCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
+import { cancelListing } from "@/integrations/supabase/actions.server";
 
 export const Route = createFileRoute("/product/$id")({
   loader: ({ params }) => {
@@ -159,6 +161,7 @@ function ProductPage() {
         seller: profile?.full_name || "Verified Seller",
         sellerScore: Number(profile?.seller_score) || 4.7,
         seller_id: data.seller_id,
+        source_order_item_id: data.source_order_item_id,
         image: gallery[0],
         gallery: gallery,
         verified: true,
@@ -340,24 +343,28 @@ function ProductPage() {
     }
   };
 
-  const deleteListing = async () => {
+  const handleCancelListing = async () => {
     if (
       !confirm(
-        "Are you sure you want to delete this listing? It will be removed from the marketplace and returned to your closet.",
+        "Are you sure you want to cancel this listing? It will be removed from the active marketplace feed but remain visible in your seller dashboard.",
       )
     )
       return;
     setBusy("delete");
     try {
-      const { error } = await supabase.from("listings").delete().eq("id", product.id);
+      const result = await cancelListing({
+        data: {
+          listingId: product.id,
+        },
+      });
 
-      if (error) throw error;
-
-      toast.success("Listing deleted successfully");
-      navigate({ to: "/orders" });
+      if (result.success) {
+        toast.success("Listing cancelled successfully");
+        navigate({ to: "/orders" });
+      }
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || "Failed to delete listing");
+      toast.error(err.message || "Failed to cancel listing");
     } finally {
       setBusy("");
     }
@@ -485,21 +492,38 @@ function ProductPage() {
 
           <div className="mt-6 flex flex-col gap-3 w-full">
             {isSeller ? (
-              <button
-                onClick={deleteListing}
-                disabled={busy === "delete"}
-                className="w-full rounded-md bg-destructive py-3.5 text-sm font-bold uppercase tracking-wide text-white hover:bg-destructive/90 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                {busy === "delete" ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Deleting Listing…
-                  </>
+              ["cancelled", "sold", "completed", "paid"].includes(product.status) ? (
+                product.source_order_item_id ? (
+                  <Link
+                    to="/resell/$orderId"
+                    params={{ orderId: product.source_order_item_id }}
+                    search={{ relistFrom: product.id }}
+                    className="w-full rounded-md bg-success py-3.5 text-sm font-bold uppercase tracking-wide text-white hover:bg-success/90 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm text-center"
+                  >
+                    <RotateCcw className="h-4 w-4" /> Relist / Resell Again
+                  </Link>
                 ) : (
-                  <>
-                    <Trash2 className="h-4 w-4" /> Delete Resell Listing
-                  </>
-                )}
-              </button>
+                  <div className="text-center py-3 text-xs font-semibold text-muted-foreground border border-border rounded bg-muted/20">
+                    Already Relisted
+                  </div>
+                )
+              ) : (
+                <button
+                  onClick={handleCancelListing}
+                  disabled={busy === "delete"}
+                  className="w-full rounded-md border border-destructive/25 text-destructive py-3.5 text-sm font-bold uppercase tracking-wide hover:bg-destructive/5 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {busy === "delete" ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Cancelling Listing…
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-4 w-4" /> Cancel Resell Listing
+                    </>
+                  )}
+                </button>
+              )
             ) : (
               <div className="flex gap-3 w-full">
                 <button

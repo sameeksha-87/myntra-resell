@@ -656,125 +656,215 @@ function OrdersPage() {
           </div>
         )}
 
-        {activeTab === "listings" && (
-          <div>
-            <div className="mb-6 flex justify-between items-center">
-              <div>
-                <h2 className="text-lg font-black uppercase tracking-wide">
-                  Active Resell Listings · {myListings.length}
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  Monitor status, review pricing details, and check verification logs
-                </p>
-              </div>
-              <button
-                onClick={fetchMyListings}
-                className="p-2 border border-border rounded-full hover:bg-muted text-muted-foreground cursor-pointer"
-                title="Refresh listings"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </button>
-            </div>
+        {activeTab === "listings" && (() => {
+          const activeListings = myListings.filter((l) => l.status !== "cancelled");
+          const cancelledListings = myListings.filter((l) => l.status === "cancelled");
 
-            {myListings.length === 0 ? (
-              <div className="rounded-md border border-dashed border-border p-16 text-center bg-card shadow-sm">
-                <ShoppingBag className="mx-auto h-10 w-10 text-muted-foreground" />
-                <h3 className="mt-3 text-lg font-bold">No active listings</h3>
-                <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto text-pretty">
-                  Select an eligible item from your closet to list it on Myntra ReSell.
-                </p>
+          return (
+            <div>
+              <div className="mb-6 flex justify-between items-center">
+                <div>
+                  <h2 className="text-lg font-black uppercase tracking-wide">
+                    My Resell Listings · {myListings.length}
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Monitor status, review pricing details, and check verification logs
+                  </p>
+                </div>
                 <button
-                  onClick={() => setActiveTab("closet")}
-                  className="mt-6 inline-block rounded-md bg-primary px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 transition shadow-sm cursor-pointer"
+                  onClick={fetchMyListings}
+                  className="p-2 border border-border rounded-full hover:bg-muted text-muted-foreground cursor-pointer"
+                  title="Refresh listings"
                 >
-                  View resell closet
+                  <RefreshCw className="h-4 w-4" />
                 </button>
               </div>
-            ) : (
-              <div className="grid gap-4">
-                {myListings.map((listing) => {
-                  const dateStr = new Date(listing.created_at).toLocaleDateString("en-IN", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  });
-                  return (
-                    <div
-                      key={listing.id}
-                      className="flex flex-col gap-4 rounded-md border border-border bg-card p-4 shadow-card md:flex-row md:items-center"
-                    >
-                      <img
-                        src={listing.image}
-                        alt={listing.title}
-                        className="h-24 w-20 flex-shrink-0 rounded-sm object-cover bg-muted border border-border"
-                      />
-                      <div className="flex-1 min-w-0 leading-normal">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] text-muted-foreground font-mono">
-                            LISTING ID: {listing.id.slice(0, 8).toUpperCase()}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground">
-                            · Listed {dateStr}
-                          </span>
-                          {getStatusBadge(listing.status)}
-                        </div>
-                        <div className="mt-1 text-base font-bold text-foreground">
-                          {listing.brand}
-                        </div>
-                        <div className="text-sm text-muted-foreground truncate">
-                          {listing.title}
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                          <span>
-                            <b>Size:</b> {listing.size}
-                          </span>
-                          <span>
-                            <b>Listing Price:</b> {inr(listing.price)}
-                          </span>
-                        </div>
-                      </div>
 
-                      <div className="flex flex-col gap-2 w-full md:w-auto">
-                        {listing.status === "verified" ? (
-                          <>
-                            <button
-                              onClick={() => handleGoLive(listing.id)}
-                              disabled={publishingId === listing.id}
-                              className="inline-flex items-center justify-center gap-1.5 rounded-md bg-verified px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white hover:bg-verified/90 transition-all cursor-pointer shadow-sm text-center disabled:opacity-50"
-                            >
-                              {publishingId === listing.id ? (
-                                <>
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Publishing...
-                                </>
-                              ) : (
-                                <>Go Live</>
-                              )}
-                            </button>
+              {/* Active Listings Section */}
+              <div className="mb-10">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">
+                  Active Listings ({activeListings.length})
+                </h3>
+                {activeListings.length === 0 ? (
+                  <div className="rounded-md border border-dashed border-border p-12 text-center bg-card shadow-sm">
+                    <ShoppingBag className="mx-auto h-8 w-8 text-muted-foreground" />
+                    <h4 className="mt-2 font-bold text-xs">No active listings</h4>
+                    <p className="text-[11px] text-muted-foreground mt-1 max-w-xs mx-auto text-pretty">
+                      Select an eligible item from your closet to list it on Myntra ReSell.
+                    </p>
+                    <button
+                      onClick={() => setActiveTab("closet")}
+                      className="mt-4 inline-block rounded-md bg-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 transition shadow-sm cursor-pointer"
+                    >
+                      View Resell Closet
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {activeListings.map((listing) => {
+                      const dateStr = new Date(listing.created_at).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      });
+                      return (
+                        <div
+                          key={listing.id}
+                          className="flex flex-col gap-4 rounded-md border border-border bg-card p-4 shadow-card md:flex-row md:items-center hover:border-primary/20 transition-all"
+                        >
+                          <img
+                            src={listing.image}
+                            alt={listing.title}
+                            className="h-24 w-20 flex-shrink-0 rounded-sm object-cover bg-muted border border-border"
+                          />
+                          <div className="flex-1 min-w-0 leading-normal">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                LISTING ID: {listing.id.slice(0, 8).toUpperCase()}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">
+                                · Listed {dateStr}
+                              </span>
+                              {getStatusBadge(listing.status)}
+                            </div>
+                            <div className="mt-1 text-base font-bold text-foreground">
+                              {listing.brand}
+                            </div>
+                            <div className="text-sm text-muted-foreground truncate">
+                              {listing.title}
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                              <span>
+                                <b>Size:</b> {listing.size}
+                              </span>
+                              <span>
+                                <b>Listing Price:</b> {inr(listing.price)}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-2 w-full md:w-auto">
+                            {listing.status === "verified" ? (
+                              <>
+                                <button
+                                  onClick={() => handleGoLive(listing.id)}
+                                  disabled={publishingId === listing.id}
+                                  className="inline-flex items-center justify-center gap-1.5 rounded-md bg-verified px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white hover:bg-verified/90 transition-all cursor-pointer shadow-sm text-center disabled:opacity-50"
+                                >
+                                  {publishingId === listing.id ? (
+                                    <>
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Publishing...
+                                    </>
+                                  ) : (
+                                    <>Go Live</>
+                                  )}
+                                </button>
+                                <Link
+                                  to="/listing/$id"
+                                  params={{ id: listing.id }}
+                                  className="inline-flex items-center justify-center gap-1.5 rounded-md border border-border px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:bg-muted transition-all cursor-pointer text-center"
+                                >
+                                  Details
+                                </Link>
+                              </>
+                            ) : (
+                              <Link
+                                to="/listing/$id"
+                                params={{ id: listing.id }}
+                                  className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-sm text-center"
+                              >
+                                Track Status <ChevronRight className="h-4 w-4" />
+                              </Link>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Cancelled Listings Section */}
+              {cancelledListings.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">
+                    Cancelled Listings ({cancelledListings.length})
+                  </h3>
+                  <div className="grid gap-4 opacity-75">
+                    {cancelledListings.map((listing) => {
+                      const dateStr = new Date(listing.created_at).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      });
+                      return (
+                        <div
+                          key={listing.id}
+                          className="flex flex-col gap-4 rounded-md border border-dashed border-border bg-muted/20 p-4 md:flex-row md:items-center hover:bg-muted/40 transition-all"
+                        >
+                          <img
+                            src={listing.image}
+                            alt={listing.title}
+                            className="h-20 w-16 flex-shrink-0 rounded-sm object-cover bg-muted border border-border filter grayscale"
+                          />
+                          <div className="flex-1 min-w-0 leading-normal">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                LISTING ID: {listing.id.slice(0, 8).toUpperCase()}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">
+                                · Cancelled {dateStr}
+                              </span>
+                              {getStatusBadge(listing.status)}
+                            </div>
+                            <div className="mt-1 text-sm font-bold text-muted-foreground">
+                              {listing.brand}
+                            </div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              {listing.title}
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                              <span>
+                                <b>Size:</b> {listing.size}
+                              </span>
+                              <span>
+                                <b>Price:</b> {inr(listing.price)}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-2 w-full md:w-auto">
+                            {listing.source_order_item_id ? (
+                              <Link
+                                to="/resell/$orderId"
+                                params={{ orderId: listing.source_order_item_id }}
+                                search={{ relistFrom: listing.id }}
+                                className="inline-flex items-center justify-center gap-1.5 rounded-md bg-success px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-success/90 transition-all cursor-pointer shadow-sm text-center"
+                              >
+                                <RefreshCw className="h-3 w-3" /> Relist Item
+                              </Link>
+                            ) : (
+                              <span className="text-[10px] font-semibold text-muted-foreground italic text-center py-2 px-3 border border-border bg-card rounded">
+                                Already Relisted
+                              </span>
+                            )}
                             <Link
                               to="/listing/$id"
                               params={{ id: listing.id }}
-                              className="inline-flex items-center justify-center gap-1.5 rounded-md border border-border px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:bg-muted transition-all cursor-pointer text-center"
+                              className="inline-flex items-center justify-center gap-1.5 rounded-md border border-border px-4 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:bg-muted transition-all cursor-pointer text-center"
                             >
-                              Details
+                              View History
                             </Link>
-                          </>
-                        ) : (
-                          <Link
-                            to="/listing/$id"
-                            params={{ id: listing.id }}
-                            className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-sm text-center"
-                          >
-                            Track Status <ChevronRight className="h-4 w-4" />
-                          </Link>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         <div className="mt-12 rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
           Not seeing an order? Only premium-brand orders within 3 years qualify for ReSell today.{" "}

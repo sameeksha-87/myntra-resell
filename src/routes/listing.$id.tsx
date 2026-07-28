@@ -24,6 +24,7 @@ import {
   decidePriceRevision,
   releaseSellerPayout,
   submitDispute,
+  cancelListing,
 } from "@/integrations/supabase/actions.server";
 import { toast } from "sonner";
 
@@ -231,6 +232,30 @@ function ListingStatus() {
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to release payout");
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleCancelListing = async () => {
+    const confirmCancel = window.confirm(
+      "Are you sure you want to cancel this listing? This will remove it from the active marketplace."
+    );
+    if (!confirmCancel) return;
+
+    setActionBusy(true);
+    try {
+      const result = await cancelListing({
+        data: {
+          listingId: id,
+        },
+      });
+      if (result.success) {
+        toast.success("Listing cancelled successfully.");
+        fetchListingData();
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to cancel listing");
     } finally {
       setActionBusy(false);
     }
@@ -528,6 +553,29 @@ function ListingStatus() {
               <div className="mt-4 bg-green-50 border border-green-200 text-success text-center py-2 text-xs font-bold uppercase tracking-wider rounded">
                 Payout released ✓
               </div>
+            )}
+
+            {/* Seller Cancel Listing Action */}
+            {isSeller && ["draft", "verification_pending", "verified", "live"].includes(listing.status) && (
+              <button
+                disabled={actionBusy}
+                onClick={handleCancelListing}
+                className="mt-4 w-full py-2 border border-destructive/20 text-destructive text-xs font-bold uppercase tracking-wider rounded cursor-pointer hover:bg-destructive/10 transition-all flex items-center justify-center gap-1.5"
+              >
+                <XCircle className="h-3.5 w-3.5" /> Cancel Listing
+              </button>
+            )}
+
+            {/* Seller Relist / Resell Again Action */}
+            {isSeller && ["cancelled", "sold", "completed", "paid"].includes(listing.status) && listing.source_order_item_id && (
+              <Link
+                to="/resell/$orderId"
+                params={{ orderId: listing.source_order_item_id }}
+                search={{ relistFrom: listing.id }}
+                className="mt-4 w-full py-2.5 bg-success text-white text-xs font-bold uppercase tracking-wider rounded cursor-pointer hover:bg-success/90 transition-all flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <RefreshCw className="h-3.5 w-3.5" /> Resell Again
+              </Link>
             )}
           </div>
 

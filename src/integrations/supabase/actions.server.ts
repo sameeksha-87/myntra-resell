@@ -224,11 +224,12 @@ export const createListingDraft = createServerFn({ method: "POST" })
       declaredGrade: z.enum(["Pristine", "Excellent", "Good"]),
       customPrice: z.number().optional().nullable(),
       conditionDetails: z.string().optional().nullable(),
+      relistFrom: z.string().uuid().optional().nullable(),
     }),
   )
   .handler(async ({ context, data }) => {
     const { userId } = context;
-    const { orderItemId, declaredGrade, customPrice, conditionDetails } = data;
+    const { orderItemId, declaredGrade, customPrice, conditionDetails, relistFrom } = data;
 
     // Check if the order item belongs to this user and is eligible
     const { data: item, error: itemError } = await supabaseAdmin
@@ -280,6 +281,23 @@ export const createListingDraft = createServerFn({ method: "POST" })
     const eligibility = item.eligibility_decisions as any;
     if (!eligibility || !eligibility.eligible) {
       throw new Error("Item is not eligible for resale");
+    }
+
+    // If relistFrom is provided, release its source_order_item_id unique constraint
+    if (relistFrom) {
+      const { data: oldListing } = await supabaseAdmin
+        .from("listings")
+        .select("id, seller_id, source_order_item_id, status")
+        .eq("id", relistFrom)
+        .single();
+
+      if (oldListing && oldListing.seller_id === userId) {
+        // Clear old listing's constraint link so we can create a new row
+        await supabaseAdmin
+          .from("listings")
+          .update({ source_order_item_id: null, updated_at: new Date().toISOString() })
+          .eq("id", relistFrom);
+      }
     }
 
     // Check if there is already an active listing for this order item
@@ -1820,6 +1838,59 @@ export const fetchListings = createServerFn({ method: "GET" })
         status: l.status,
       };
     });
+  });
+
+export const cancelListing = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    z.object({
+      listingId: z.string().uuid(),
+    }),
+  )
+  .handler(async ({ context, data }) => {
+    const { userId } = context;
+    const { listingId } = data;
+
+    // Check ownership of listing
+    const { data: listing, error: listingErr } = await supabaseAdmin
+      .from("listings")
+      .select("*")
+      .eq("id", listingId)
+      .single();
+
+    if (listingErr || !listing) throw new Error("Listing not found");
+    if (listing.seller_id !== userId) throw new Error("Unauthorized");
+
+    // Only allow cancelling active listings (draft, verification_pending, verified, live, reserved)
+    const activeStatuses = ["draft", "verification_pending", "verified", "live", "reserved"];
+    if (!activeStatuses.includes(listing.status)) {
+      throw new Error(`Cannot cancel listing with status: ${listing.status}`);
+    }
+
+    const { error: updateErr } = await supabaseAdmin
+      .from("listings")
+      .update({
+        status: "cancelled",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", listingId);
+
+    if (updateErr) {
+      throw new Error(`Failed to cancel listing: ${updateErr.message}`);
+    }
+
+    // Log listing event
+    await supabaseAdmin.from("listing_events").insert({
+      listing_id: listingId,
+      sequence: 4,
+      event_type: "listing_cancelled",
+      from_state: listing.status,
+      to_state: "cancelled",
+      actor_type: "seller",
+      actor_id: userId,
+    });
+
+    return { success: true };
   });
 
 export const setSimulatedRole = createServerFn({ method: "POST" })
